@@ -19,7 +19,6 @@ import ReelsDecisionSystem from "./components/ReelsDecisionSystem";
 import ReelsTable from "./components/ReelsTable";
 import ReportPanel from "./components/ReportPanel";
 import TopPerformerBoard from "./components/TopPerformerBoard";
-import WinnersPatterns from "./components/WinnersPatterns";
 import MonetizationPage from "./pages/MonetizationPage";
 
 const PAGE_SIZE = 25;
@@ -643,23 +642,14 @@ export default function App() {
                 <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
               </CollapsibleAnalysisSection>
 
-              <div className="space-y-6">
+              {account?.countries?.length ? (
                 <CollapsibleAnalysisSection
-                  title="Winning patterns"
-                  description="Use this when you need the strategic pattern read behind the top reels, not on every visit."
+                  title="Country breakdown"
+                  description="Open this only when geography matters for the current decision or distribution plan."
                 >
-                  <WinnersPatterns patterns={summary?.winnersPatterns || { captionBand: {}, topCountries: [] }} />
+                  <CountryBreakdown countries={account.countries} />
                 </CollapsibleAnalysisSection>
-
-                {account?.countries?.length ? (
-                  <CollapsibleAnalysisSection
-                    title="Country breakdown"
-                    description="Open this only when geography matters for the current decision or distribution plan."
-                  >
-                    <CountryBreakdown countries={account.countries} />
-                  </CollapsibleAnalysisSection>
-                ) : null}
-              </div>
+              ) : null}
             </div>
 
             <CollapsibleAnalysisSection
