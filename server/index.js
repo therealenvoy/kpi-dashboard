@@ -113,10 +113,6 @@ function validateStartupEnv() {
   }
 
   if (process.env.NODE_ENV === "production") {
-    if (!process.env.DATABASE_URL) {
-      missing.push("DATABASE_URL");
-    }
-
     if (!ADMIN_VIEW_CODE) {
       missing.push("ADMIN_VIEW_CODE");
     }
