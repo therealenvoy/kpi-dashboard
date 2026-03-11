@@ -1,0 +1,278 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --accent: 215 184 120;
+  --accent-soft: 215 184 120 / 0.12;
+  --money: 215 184 120;
+  --money-soft: 215 184 120 / 0.14;
+  --cool: 148 158 176;
+  --cool-soft: 148 158 176 / 0.08;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply min-h-screen bg-ink font-body text-slate-100 antialiased;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.04), transparent 26%),
+    radial-gradient(circle at 78% 8%, rgba(var(--accent-soft)), transparent 18%),
+    linear-gradient(180deg, #060708 0%, #090b0f 38%, #050608 100%);
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+.panel {
+  @apply rounded-[2rem] border bg-white/[0.02] backdrop-blur-xl;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 16px 44px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.hero-shell {
+  @apply rounded-[2.3rem] border backdrop-blur-xl;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.05), transparent 24%),
+    radial-gradient(circle at 85% 12%, rgba(var(--money-soft)), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008)),
+    #08090b;
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.hero-primary-card {
+  @apply rounded-[2rem] border;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    radial-gradient(circle at 18% 4%, rgba(var(--money-soft)), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008)),
+    #0a0b0d;
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.support-card {
+  @apply rounded-[1.75rem] border p-5;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.008)),
+    rgba(9, 10, 12, 0.82);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.024);
+}
+
+.rank-panel {
+  @apply rounded-[1.9rem] border p-5;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.004)),
+    rgba(8, 9, 11, 0.88);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.rank-row {
+  @apply rounded-[1.2rem] border p-4 transition-colors;
+  border-color: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.rank-row:hover {
+  background: rgba(255, 255, 255, 0.022);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-row {
+  @apply grid items-start gap-3;
+  grid-template-columns: 44px 64px minmax(0, 1fr) auto;
+}
+
+.leaderboard-rank {
+  @apply font-display text-[2rem] leading-none;
+}
+
+.editorial-panel {
+  @apply rounded-[1.9rem] border;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006)),
+    rgba(9, 10, 12, 0.8);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.022);
+}
+
+.editorial-card {
+  @apply rounded-[1.5rem] border p-5;
+  border-color: rgba(255, 255, 255, 0.045);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006)),
+    rgba(10, 11, 13, 0.56);
+}
+
+.drilldown-panel {
+  @apply rounded-[1.9rem] border;
+  border-color: rgba(255, 255, 255, 0.045);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(255, 255, 255, 0.004)),
+    rgba(8, 9, 11, 0.6);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.drilldown-row {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.drilldown-row:hover {
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.collapsible-panel {
+  @apply rounded-[1.55rem] border px-5 py-4;
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.012), rgba(255, 255, 255, 0.004)),
+    rgba(8, 9, 11, 0.46);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.collapsible-panel-open {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006)),
+    rgba(8, 9, 11, 0.62);
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.024);
+}
+
+.money-panel,
+.money-card,
+.cool-card {
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006)),
+    rgba(10, 11, 13, 0.72);
+}
+
+.metric-card {
+  @apply panel relative overflow-hidden p-6;
+}
+
+.metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 35%);
+  pointer-events: none;
+}
+
+.accent-pill {
+  @apply inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300;
+  background: rgba(var(--accent), 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.accent-glow {
+  box-shadow:
+    0 0 0 1px rgba(var(--accent), 0.14),
+    0 20px 60px rgba(0, 0, 0, 0.22);
+}
+
+.subtle-rule {
+  position: relative;
+}
+
+.subtle-rule::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 28px;
+  height: 1px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, rgba(var(--accent), 0.85), transparent);
+}
+
+.table-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(140, 161, 192, 0.35);
+  border-radius: 999px;
+}
+
+.quiet-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 36px 36px;
+  background-position: center;
+}
+
+.status-pulse {
+  position: relative;
+}
+
+.status-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.18;
+  animation: statusPulse 1.8s ease-out infinite;
+}
+
+.progress-slim {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-slim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), rgba(var(--money), 0.82), rgba(255, 255, 255, 0.12), transparent);
+  animation: progressSlide 1.4s linear infinite;
+}
+
+@keyframes statusPulse {
+  0% {
+    transform: scale(0.65);
+    opacity: 0.22;
+  }
+  80% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes progressSlide {
+  100% {
+    transform: translateX(100%);
+  }
+}
