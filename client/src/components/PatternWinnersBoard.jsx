@@ -33,7 +33,7 @@ function getStrategicFinding(pattern) {
   }
 }
 
-export default function PatternWinnersBoard({ patterns, showHeader = true }) {
+export default function PatternWinnersBoard({ patterns, showHeader = true, canViewRevenue = true }) {
   if (!patterns?.length) {
     return null;
   }
@@ -44,7 +44,11 @@ export default function PatternWinnersBoard({ patterns, showHeader = true }) {
         <SectionHeader
           eyebrow="Pattern Winners"
           title="Scale formats, not one-offs"
-          description="These are the format-level winners this month based on estimated paid subscribers and net revenue."
+          description={
+            canViewRevenue
+              ? "These are the format-level winners this month based on estimated paid subscribers and net revenue."
+              : "These are the format-level winners this month based on estimated paid subscribers and paid-share quality."
+          }
         />
       ) : null}
 
@@ -68,12 +72,16 @@ export default function PatternWinnersBoard({ patterns, showHeader = true }) {
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">Proof</p>
                   <p className="mt-1 text-[1.1rem] font-semibold leading-5 text-white">{pattern.winner.estimatedPaidSubs} paid subs</p>
-                  <p className="mt-2 text-[12px] leading-5 text-slate-400">{formatCurrency(pattern.winner.estimatedNetRevenue)} est. net revenue</p>
+                  <p className="mt-2 text-[12px] leading-5 text-slate-400">
+                    {canViewRevenue ? `${formatCurrency(pattern.winner.estimatedNetRevenue)} est. net revenue` : `${pattern.winner.reels} reels in this pattern`}
+                  </p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">Quality</p>
                   <p className="mt-1 text-[1.1rem] font-semibold leading-5 text-white">{pattern.winner.paidShare}% paid share</p>
-                  <p className="mt-2 text-[12px] leading-5 text-slate-400">{pattern.winner.reels} reels in this pattern</p>
+                  <p className="mt-2 text-[12px] leading-5 text-slate-400">
+                    {canViewRevenue ? `${pattern.winner.reels} reels in this pattern` : "Revenue hidden in worker mode"}
+                  </p>
                 </div>
               </div>
             </article>

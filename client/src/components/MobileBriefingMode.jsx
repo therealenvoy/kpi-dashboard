@@ -9,8 +9,17 @@ function MobileMetric({ label, value, tone = "text-white" }) {
   );
 }
 
-export default function MobileBriefingMode({ currentMonth, metrics, topPaidReel, topMoneyReels, patternWinners, onOpenDay, latestDate }) {
-  const topReels = (topMoneyReels || []).slice(0, 3);
+export default function MobileBriefingMode({
+  currentMonth,
+  metrics,
+  topPaidReel,
+  topMoneyReels,
+  patternWinners,
+  canViewRevenue = true,
+  onOpenDay,
+  latestDate
+}) {
+  const topReels = (canViewRevenue ? topMoneyReels : [topPaidReel, ...(topMoneyReels || [])]).filter(Boolean).slice(0, 3);
   const topPatterns = (patternWinners || []).slice(0, 2);
 
   return (
@@ -23,10 +32,18 @@ export default function MobileBriefingMode({ currentMonth, metrics, topPaidReel,
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3">
-          <MobileMetric label="Month net" value={formatCurrency(currentMonth?.totalRevenue)} tone="text-amber-50" />
+          <MobileMetric
+            label={canViewRevenue ? "Month net" : "Paid subs"}
+            value={canViewRevenue ? formatCurrency(currentMonth?.totalRevenue) : String(currentMonth?.totalPaidSubs || 0)}
+            tone="text-amber-50"
+          />
           <div className="grid grid-cols-2 gap-3">
             <MobileMetric label="Paid share" value={formatPercent(metrics?.paidShare)} tone="text-amber-100" />
-            <MobileMetric label="Rev / paid sub" value={formatCurrency(metrics?.revenuePerPaidSub)} tone="text-amber-100" />
+            <MobileMetric
+              label={canViewRevenue ? "Rev / paid sub" : "New subs"}
+              value={canViewRevenue ? formatCurrency(metrics?.revenuePerPaidSub) : String(currentMonth?.totalNewSubs || 0)}
+              tone="text-amber-100"
+            />
           </div>
         </div>
       </div>
@@ -41,7 +58,9 @@ export default function MobileBriefingMode({ currentMonth, metrics, topPaidReel,
             </h3>
             <p className="mt-3 text-[12px] leading-5 text-amber-50/78">
               {topPaidReel
-                ? `${topPaidReel.estimatedPaidSubs} estimated paid subs and ${formatCurrency(topPaidReel.estimatedNetRevenue)} in estimated net.`
+                ? canViewRevenue
+                  ? `${topPaidReel.estimatedPaidSubs} estimated paid subs and ${formatCurrency(topPaidReel.estimatedNetRevenue)} in estimated net.`
+                  : `${topPaidReel.estimatedPaidSubs} estimated paid subs at ${topPaidReel.paidShare}% paid share.`
                 : "Run another sync to surface the next scale candidate."}
             </p>
           </article>
@@ -64,7 +83,9 @@ export default function MobileBriefingMode({ currentMonth, metrics, topPaidReel,
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Top 3 reels</p>
-            <p className="mt-1 text-[12px] text-slate-400">Highest estimated money drivers this month.</p>
+            <p className="mt-1 text-[12px] text-slate-400">
+              {canViewRevenue ? "Highest estimated money drivers this month." : "Highest estimated paid-sub drivers this month."}
+            </p>
           </div>
           {onOpenDay && latestDate ? (
             <button
@@ -82,12 +103,16 @@ export default function MobileBriefingMode({ currentMonth, metrics, topPaidReel,
             <article key={reel.reelId} className="rounded-[1.2rem] border border-white/8 bg-white/[0.025] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">#{index + 1} money driver</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    #{index + 1} {canViewRevenue ? "money driver" : "paid-sub driver"}
+                  </p>
                   <h3 className="mt-1 text-[14px] font-semibold leading-5 text-white">{truncate(reel.caption, 46)}</h3>
                 </div>
                 <div className="text-right">
-                  <p className="font-display text-[1.65rem] leading-none text-amber-50">{formatCurrency(reel.estimatedNetRevenue)}</p>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-amber-100/65">Net</p>
+                  <p className="font-display text-[1.65rem] leading-none text-amber-50">
+                    {canViewRevenue ? formatCurrency(reel.estimatedNetRevenue) : reel.estimatedPaidSubs}
+                  </p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-amber-100/65">{canViewRevenue ? "Net" : "Paid"}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
@@ -110,7 +135,9 @@ export default function MobileBriefingMode({ currentMonth, metrics, topPaidReel,
               </div>
               <h3 className="mt-2 font-display text-[1.5rem] leading-[1] text-white">{pattern.winner.label}</h3>
               <p className="mt-3 text-[12px] leading-5 text-slate-300">
-                {pattern.winner.estimatedPaidSubs} estimated paid subs and {formatCurrency(pattern.winner.estimatedNetRevenue)} in estimated net revenue.
+                {canViewRevenue
+                  ? `${pattern.winner.estimatedPaidSubs} estimated paid subs and ${formatCurrency(pattern.winner.estimatedNetRevenue)} in estimated net revenue.`
+                  : `${pattern.winner.estimatedPaidSubs} estimated paid subs at ${pattern.winner.paidShare}% paid share.`}
               </p>
             </article>
           ))}

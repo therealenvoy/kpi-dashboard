@@ -2,7 +2,7 @@ import { formatCurrency, truncate } from "../lib/formatters";
 import ReelThumbnail from "./ReelThumbnail";
 import SectionHeader from "./SectionHeader";
 
-export default function TopPaidSubsReels({ reels, showHeader = true }) {
+export default function TopPaidSubsReels({ reels, showHeader = true, canViewRevenue = true }) {
   if (!reels?.length) {
     return null;
   }
@@ -29,7 +29,7 @@ export default function TopPaidSubsReels({ reels, showHeader = true }) {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Paid-sub driver</p>
                 <h3 className="mt-1 text-[15px] font-semibold leading-6 text-white">{truncate(reel.caption, 72)}</h3>
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
-                  <span className="text-slate-400">Net {formatCurrency(reel.estimatedNetRevenue)}</span>
+                  {canViewRevenue ? <span className="text-slate-400">Net {formatCurrency(reel.estimatedNetRevenue)}</span> : null}
                   <span className="text-slate-400">Paid share {reel.paidShare}%</span>
                   <span className="text-slate-500">Free {reel.estimatedFreeSubs}</span>
                 </div>

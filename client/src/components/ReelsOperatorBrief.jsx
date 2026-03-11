@@ -1,4 +1,4 @@
-import { formatDate, formatSignedCompactNumber, getReelInsightReasons, truncate } from "../lib/formatters";
+import { formatDecisionLabel, formatSignedCompactNumber, truncate } from "../lib/formatters";
 
 function getDominantCaptionBand(patterns) {
   return Object.entries(patterns?.captionBand || {}).sort((a, b) => (b[1] || 0) - (a[1] || 0))[0]?.[0] || "short";
@@ -15,7 +15,7 @@ function getWeekdayLabel(value) {
     sun: "Sunday"
   };
 
-  return labels[value] || "this day";
+  return labels[value] || "";
 }
 
 function formatCaptionBandLabel(value) {
@@ -35,66 +35,73 @@ function formatCaptionBandLabel(value) {
 }
 
 export default function ReelsOperatorBrief({ summary, patterns, onSelectReel }) {
-  const winning = summary?.highlights?.scale || summary?.highlights?.breakoutScore || null;
-  const fading = summary?.highlights?.underperforming || null;
+  const roadmap = summary?.workflowRoadmap || [];
+  const scaleLane = roadmap.find((lane) => lane.key === "scale") || null;
+  const watchLane = roadmap.find((lane) => lane.key === "watch") || null;
+  const dropLane = roadmap.find((lane) => lane.key === "drop") || null;
+  const fading = summary?.highlights?.underperforming || dropLane?.sampleReel || null;
+  const watchReel = watchLane?.sampleReel || null;
   const dominantCaptionBand = getDominantCaptionBand(patterns);
   const weekdayLabel = getWeekdayLabel(patterns?.topWeekday);
-  const headline = `${formatCaptionBandLabel(dominantCaptionBand)} are winning. Repeat them next.`;
-  const subline = winning
-    ? `${truncate(winning.caption, 44)} is the clearest current winner${
-        fading ? `, while ${truncate(fading.caption, 34)} is fading and should not shape the next round.` : "."
-      }`
-    : "The current slice does not have a clear winner yet.";
+  const headline = `${formatCaptionBandLabel(dominantCaptionBand)} are winning.`;
+  const subline = weekdayLabel ? `Make 3 more this week. Start ${weekdayLabel}.` : "Make 3 more this week.";
+  const watchLabel = watchReel ? formatDecisionLabel(watchReel.workflowDecision) : "Watch";
 
   return (
     <section className="hero-primary-card px-6 py-6 md:px-8 md:py-8">
       <div className="max-w-5xl space-y-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reels intelligence</p>
-        <h2 className="max-w-5xl font-display text-[2.4rem] leading-[0.98] text-white md:text-[4.35rem]">{headline}</h2>
-        <p className="max-w-3xl text-[13px] leading-6 text-slate-300 md:text-[15px]">{subline}</p>
-      </div>
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">What to do next</p>
+          <h2 className="max-w-3xl font-display text-[2.5rem] leading-[0.92] text-white md:text-[4.25rem] xl:text-[4.6rem]">{headline}</h2>
+          <p className="max-w-xl text-[15px] leading-7 text-slate-300 md:text-[17px]">{subline}</p>
+        </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-3">
-        <button
-          type="button"
-          onClick={() => winning && onSelectReel(winning)}
-          className="rounded-[1.45rem] border border-white/6 bg-black/18 p-5 text-left transition-colors hover:bg-white/[0.03]"
-        >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Winning now</p>
-          <h3 className="mt-3 font-display text-[1.8rem] leading-[1.02] text-white">
-            {winning ? truncate(winning.caption, 34) : "No clear winner yet"}
-          </h3>
-          <p className="mt-3 text-[12px] leading-6 text-slate-300">
-            {winning ? getReelInsightReasons(winning).join(" · ") : "Wait for a stronger winner set."}
-          </p>
-          {winning ? <p className="mt-5 text-[11px] text-slate-500">{formatDate(winning.postedAt)}</p> : null}
-        </button>
+        <div className="grid gap-3 md:grid-cols-3">
+          <article className="rounded-[1.4rem] border border-white/8 bg-white/[0.02] p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Do next</p>
+            <h3 className="mt-3 font-display text-[1.4rem] leading-[1] text-white">{formatCaptionBandLabel(dominantCaptionBand)}</h3>
+            <p className="mt-2 text-[13px] leading-6 text-slate-300">
+              {weekdayLabel
+                ? `Build 3 fresh variants and schedule the first repeat on ${weekdayLabel}.`
+                : "Build 3 fresh variants and schedule the first repeat this week."}
+            </p>
+            <p className="mt-4 text-[11px] text-slate-500">{scaleLane?.count || 0} reels currently score as scale.</p>
+          </article>
 
-        <button
-          type="button"
-          onClick={() => fading && onSelectReel(fading)}
-          className="rounded-[1.45rem] border border-white/6 bg-black/18 p-5 text-left transition-colors hover:bg-white/[0.03]"
-        >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Fading now</p>
-          <h3 className="mt-3 font-display text-[1.8rem] leading-[1.02] text-white">
-            {fading ? truncate(fading.caption, 34) : "No weak reel surfaced"}
-          </h3>
-          <p className="mt-3 font-display text-[2.2rem] leading-none text-[#d7b878]">
-            {formatSignedCompactNumber(fading?.views24hDelta)}
-          </p>
-          <p className="mt-2 text-[12px] leading-6 text-slate-300">
-            {fading ? "Momentum has stalled. Do not repeat this concept until the signal improves." : "The current slice does not show a clear drop candidate."}
-          </p>
-        </button>
+          <button
+            type="button"
+            onClick={() => fading && onSelectReel(fading)}
+            className="rounded-[1.4rem] border border-white/8 bg-white/[0.02] p-5 text-left transition-colors hover:bg-white/[0.04]"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Stop doing</p>
+            <h3 className="mt-3 font-display text-[1.4rem] leading-[1.02] text-white">
+              {fading ? truncate(fading.caption, 26) : "No clear drop"}
+            </h3>
+            <p className="mt-2 text-[13px] leading-6 text-slate-300">
+              {fading
+                ? "Momentum has stalled. Do not let this concept shape the next round."
+                : "Nothing is weak enough to kill outright yet."}
+            </p>
+            {fading ? <p className="mt-4 text-[11px] text-[#d7b878]">{formatSignedCompactNumber(fading.views24hDelta)} in the last 24h.</p> : null}
+          </button>
 
-        <article className="rounded-[1.45rem] border border-white/6 bg-black/18 p-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Repeat next</p>
-          <h3 className="mt-3 font-display text-[1.8rem] leading-[1.02] text-white">{formatCaptionBandLabel(dominantCaptionBand)}</h3>
-          <p className="mt-3 font-display text-[2.2rem] leading-none text-[#d7b878]">{weekdayLabel}</p>
-          <p className="mt-2 text-[12px] leading-6 text-slate-300">
-            Likely because the hook resolves faster. Make 3 fresh variants and schedule the first repeat on {weekdayLabel}.
-          </p>
-        </article>
+          <button
+            type="button"
+            onClick={() => watchReel && onSelectReel(watchReel)}
+            className="rounded-[1.4rem] border border-white/8 bg-white/[0.02] p-5 text-left transition-colors hover:bg-white/[0.04]"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Watch</p>
+            <h3 className="mt-3 font-display text-[1.4rem] leading-[1.02] text-white">
+              {watchReel ? truncate(watchReel.caption, 26) : "No borderline reel"}
+            </h3>
+            <p className="mt-2 text-[13px] leading-6 text-slate-300">
+              {watchReel
+                ? `${watchLabel} this one for another cycle before you repeat it.`
+                : "Nothing is sitting in the maybe lane right now."}
+            </p>
+            {watchLane?.count ? <p className="mt-4 text-[11px] text-slate-500">{watchLane.count} reels still need another check.</p> : null}
+          </button>
+        </div>
       </div>
     </section>
   );

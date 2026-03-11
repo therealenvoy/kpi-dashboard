@@ -1,7 +1,7 @@
 import { formatCompactNumber, formatCurrency, formatDate, formatPercent } from "../lib/formatters";
 import SectionHeader from "./SectionHeader";
 
-export default function MonetizationDailyTable({ rows, onSelectDay }) {
+export default function MonetizationDailyTable({ rows, onSelectDay, canViewRevenue = true }) {
   return (
     <section className="drilldown-panel p-5 md:p-6">
       <SectionHeader
@@ -26,9 +26,13 @@ export default function MonetizationDailyTable({ rows, onSelectDay }) {
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">New subs</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Paid</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Free</th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Net Rev</th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Subs Rev</th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Msg + Tips</th>
+              {canViewRevenue ? (
+                <>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Net Rev</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Subs Rev</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Msg + Tips</th>
+                </>
+              ) : null}
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Visit→Sub</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Visit→Paid</th>
             </tr>
@@ -45,9 +49,13 @@ export default function MonetizationDailyTable({ rows, onSelectDay }) {
                 <td className="px-3 py-3.5 text-[13px] text-slate-400">{formatCompactNumber(row.newSubs)}</td>
                 <td className="px-3 py-3.5 text-[13px] font-semibold text-amber-100/92">{formatCompactNumber(row.paidSubs)}</td>
                 <td className="px-3 py-3.5 text-[13px] text-sky-100/68">{formatCompactNumber(row.freeSubs)}</td>
-                <td className="px-3 py-3.5 text-[13px] font-semibold text-amber-50/92">{formatCurrency(row.earningsTotal)}</td>
-                <td className="px-3 py-3.5 text-[13px] text-amber-100/72">{formatCurrency(row.earningsSubscribes)}</td>
-                <td className="px-3 py-3.5 text-[13px] text-sky-100/68">{formatCurrency(row.earningsSupport)}</td>
+                {canViewRevenue ? (
+                  <>
+                    <td className="px-3 py-3.5 text-[13px] font-semibold text-amber-50/92">{formatCurrency(row.earningsTotal)}</td>
+                    <td className="px-3 py-3.5 text-[13px] text-amber-100/72">{formatCurrency(row.earningsSubscribes)}</td>
+                    <td className="px-3 py-3.5 text-[13px] text-sky-100/68">{formatCurrency(row.earningsSupport)}</td>
+                  </>
+                ) : null}
                 <td className="px-3 py-3.5 text-[13px] text-slate-400">{formatPercent(row.visitToSubConversion)}</td>
                 <td className="rounded-r-3xl px-3 py-3.5 text-[13px] font-semibold text-amber-100/88">{formatPercent(row.visitToPaidConversion)}</td>
               </tr>

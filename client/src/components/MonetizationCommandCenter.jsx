@@ -32,7 +32,7 @@ function getMonthVerdict(metrics) {
   };
 }
 
-export default function MonetizationCommandCenter({ currentMonth, metrics, topPaidReel, topPattern }) {
+export default function MonetizationCommandCenter({ currentMonth, metrics, topPaidReel, topPattern, canViewRevenue = true }) {
   const verdict = getMonthVerdict(metrics);
 
   return (
@@ -44,15 +44,21 @@ export default function MonetizationCommandCenter({ currentMonth, metrics, topPa
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Monetization</p>
             <p className="text-[13px] leading-6 text-slate-300">This month</p>
             <p className="font-display text-[4rem] leading-[0.88] text-white md:text-[6rem]">
-              {formatCurrency(currentMonth?.totalRevenue)}
+              {canViewRevenue ? formatCurrency(currentMonth?.totalRevenue) : formatFullNumber(currentMonth?.totalPaidSubs)}
             </p>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px]">
               <span className="text-slate-300">
                 Paid share <span className="text-[#d7b878]">{formatPercent(metrics?.paidShare)}</span>
               </span>
-              <span className="text-slate-300">
-                Revenue / paid sub <span className="text-[#d7b878]">{formatCurrency(metrics?.revenuePerPaidSub)}</span>
-              </span>
+              {canViewRevenue ? (
+                <span className="text-slate-300">
+                  Revenue / paid sub <span className="text-[#d7b878]">{formatCurrency(metrics?.revenuePerPaidSub)}</span>
+                </span>
+              ) : (
+                <span className="text-slate-300">
+                  New subs <span className="text-[#d7b878]">{formatFullNumber(currentMonth?.totalNewSubs)}</span>
+                </span>
+              )}
             </div>
             <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${verdict.tone}`}>{verdict.title}</p>
             <p className="max-w-2xl text-[13px] leading-6 text-slate-400">{verdict.detail}</p>
@@ -83,7 +89,9 @@ export default function MonetizationCommandCenter({ currentMonth, metrics, topPa
               </h3>
               <p className="text-[12px] leading-6 text-slate-400">
                 {topPaidReel
-                  ? `${topPaidReel.estimatedPaidSubs} estimated paid subs and ${formatCurrency(topPaidReel.estimatedNetRevenue)} in estimated net revenue.`
+                  ? canViewRevenue
+                    ? `${topPaidReel.estimatedPaidSubs} estimated paid subs and ${formatCurrency(topPaidReel.estimatedNetRevenue)} in estimated net revenue.`
+                    : `${topPaidReel.estimatedPaidSubs} estimated paid subs at ${topPaidReel.paidShare}% paid share.`
                   : "Once enough data is available, this will surface the clearest reel to repeat."}
               </p>
             </div>

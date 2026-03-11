@@ -133,6 +133,7 @@ export default function MonetizationPage() {
   const topPattern = summary?.patternWinners?.[0] || null;
   const latestFinishedAt = status?.latestSync?.finished_at || syncJob?.finishedAt || null;
   const hasCriticalError = Boolean(error && !summary && !daily.length && !loading);
+  const canViewRevenue = Boolean(status?.canViewRevenue);
 
   return (
     <div className="space-y-8">
@@ -142,7 +143,13 @@ export default function MonetizationPage() {
 
       <section className="space-y-4">
         <div className="hidden md:block">
-          <MonetizationCommandCenter currentMonth={currentMonth} metrics={summary?.operatorMetrics} topPaidReel={topPaidReel} topPattern={topPattern} />
+          <MonetizationCommandCenter
+            currentMonth={currentMonth}
+            metrics={summary?.operatorMetrics}
+            topPaidReel={topPaidReel}
+            topPattern={topPattern}
+            canViewRevenue={canViewRevenue}
+          />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
@@ -161,9 +168,13 @@ export default function MonetizationPage() {
                     <span className="text-[11px] text-sky-100/75">Refreshing in place…</span>
                   ) : null}
                 </div>
-                <h1 className="font-display text-[1.75rem] leading-tight text-white md:text-[2.45rem]">Daily revenue board</h1>
+                <h1 className="font-display text-[1.75rem] leading-tight text-white md:text-[2.45rem]">
+                  {canViewRevenue ? "Daily revenue board" : "Daily subscriber board"}
+                </h1>
                 <p className="max-w-2xl text-[13px] leading-6 text-slate-300">
-                  Use the control room above for the answer. Use the sections below to understand the drivers, formats, and daily details behind it.
+                  {canViewRevenue
+                    ? "Use the control room above for the answer. Use the sections below to understand the drivers, formats, and daily details behind it."
+                    : "This view hides money and keeps the focus on daily paid subscribers, quality, and the reels most likely bringing buyers."}
                 </p>
                 {notice ? <p className="text-[12px] text-sky-100/72">{notice}</p> : null}
                 {!hasCriticalError && error ? <p className="text-[12px] text-rose-200/80">{error}</p> : null}
@@ -186,6 +197,9 @@ export default function MonetizationPage() {
                 ? `Monetization sync is configured. Latest stored day: ${status.latestDate || "none yet"}.`
                 : status?.message || "Set DATABASE_URL and ONLYFANS_API_KEY to enable this module."}
             </p>
+            <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+              Viewer mode: {status?.viewerMode || "worker"} {canViewRevenue ? "· money visible" : "· money hidden"}
+            </p>
             {latestFinishedAt ? (
               <p className="mt-3 text-[12px] text-slate-400">Latest completed sync: {formatDateTime(latestFinishedAt)}</p>
             ) : null}
@@ -200,7 +214,7 @@ export default function MonetizationPage() {
                 {status.latestSync.details.metricCoverage.requestedDays} days on the last sync
               </p>
             ) : null}
-            {status?.latestSync?.details?.revenueCoverage ? (
+            {canViewRevenue && status?.latestSync?.details?.revenueCoverage ? (
               <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-slate-500">
                 Revenue split:
                 {status.latestSync.details.revenueCoverage.total ? " total" : " total fallback"}
@@ -233,6 +247,7 @@ export default function MonetizationPage() {
             topPaidReel={topPaidReel}
             topMoneyReels={summary?.topMoneyReels}
             patternWinners={summary?.patternWinners}
+            canViewRevenue={canViewRevenue}
             onOpenDay={status?.latestDate ? setSelectedDate : undefined}
             latestDate={status?.latestDate}
           />
@@ -243,18 +258,22 @@ export default function MonetizationPage() {
               title="Are we having a good month?"
               description="This zone reduces the month to signal quality, subscriber quality, and the one operating read that matters right now."
             />
-            <MonetizationInsights metrics={summary?.operatorMetrics} showHeader={false} />
+            <MonetizationInsights metrics={summary?.operatorMetrics} showHeader={false} canViewRevenue={canViewRevenue} />
           </section>
 
           <section className="hidden space-y-4 md:block">
             <SectionHeader
               eyebrow="Drivers"
               title="Which reels are actually moving buyers?"
-              description="Read these as ranked decisions. One board shows which reels appear to create paid subscribers. The other shows which ones appear to create money."
+              description={
+                canViewRevenue
+                  ? "Read these as ranked decisions. One board shows which reels appear to create paid subscribers. The other shows which ones appear to create money."
+                  : "Read these as ranked decisions. This view keeps the focus on paid-subscriber pressure, not revenue."
+              }
             />
-            <div className="grid gap-4 2xl:grid-cols-2">
+            <div className={`grid gap-4 ${canViewRevenue ? "2xl:grid-cols-2" : ""}`}>
               <TopPaidSubsReels reels={summary?.topPaidSubsReels} showHeader={false} />
-              <TopMoneyReels reels={summary?.topMoneyReels} showHeader={false} />
+              {canViewRevenue ? <TopMoneyReels reels={summary?.topMoneyReels} showHeader={false} /> : null}
             </div>
           </section>
 
@@ -262,9 +281,13 @@ export default function MonetizationPage() {
             <SectionHeader
               eyebrow="Patterns"
               title="What format is winning this month?"
-              description="This is the scaling layer. Use it to repeat the formats that are producing paid subscribers and net revenue, not just spikes in attention."
+              description={
+                canViewRevenue
+                  ? "This is the scaling layer. Use it to repeat the formats that are producing paid subscribers and net revenue, not just spikes in attention."
+                  : "This is the scaling layer. Use it to repeat the formats that are producing paid subscribers, not just spikes in attention."
+              }
             />
-            <PatternWinnersBoard patterns={summary?.patternWinners} showHeader={false} />
+            <PatternWinnersBoard patterns={summary?.patternWinners} showHeader={false} canViewRevenue={canViewRevenue} />
           </section>
 
           <section className="hidden space-y-4 md:block">
@@ -273,13 +296,14 @@ export default function MonetizationPage() {
               title="Forensic detail, only when you need it."
               description="This is intentionally quieter. Use it after the higher-level answers above, when you want to inspect a single day and open the reel-driver drill-down."
             />
-            <MonetizationDailyTable rows={daily} onSelectDay={setSelectedDate} />
+            <MonetizationDailyTable rows={daily} onSelectDay={setSelectedDate} canViewRevenue={canViewRevenue} />
           </section>
         </>
       )}
 
       <MonetizationDayDrawer
         payload={selectedDay}
+        canViewRevenue={canViewRevenue}
         onClose={() => {
           setSelectedDate("");
           setSelectedDay(null);

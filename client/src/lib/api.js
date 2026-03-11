@@ -37,6 +37,21 @@ export async function fetchMonetizationStatus() {
   return data;
 }
 
+export async function fetchViewer() {
+  const { data } = await api.get("/viewer");
+  return data;
+}
+
+export async function unlockViewer(code) {
+  const { data } = await api.post("/viewer/unlock", { code });
+  return data;
+}
+
+export async function lockViewer() {
+  const { data } = await api.post("/viewer/lock");
+  return data;
+}
+
 export async function fetchMonetizationDaily(params) {
   const { data } = await api.get("/monetization/daily", { params });
   return data;

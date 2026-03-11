@@ -12,10 +12,16 @@ const cache = new NodeCache({ stdTTL: 60 * 60, checkperiod: 120 });
 const cacheMetadata = {};
 
 const PORT = Number(process.env.PORT) || 3000;
+const ADMIN_VIEW_CODE = String(process.env.ADMIN_VIEW_CODE || "").trim();
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const SHEETS_BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 const CACHE_TTL_SECONDS = 60 * 60;
+const VIEWER_COOKIE_NAME = "kpi_viewer";
+const CORS_ORIGINS = String(process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const AGE_BUCKETS = [
   { key: "0-24h", label: "0-24h", minHours: 0, maxHours: 24 },
@@ -24,14 +30,114 @@ const AGE_BUCKETS = [
   { key: "7d+", label: "7d+", minHours: 168, maxHours: Number.POSITIVE_INFINITY }
 ];
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (process.env.NODE_ENV !== "production") {
+        return callback(null, true);
+      }
+
+      if (CORS_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS origin not allowed."));
+    },
+    credentials: true
+  })
+);
 app.use(express.json());
+
+function parseCookies(req) {
+  const header = req.headers.cookie || "";
+
+  return header.split(";").reduce((acc, entry) => {
+    const [rawKey, ...rawValue] = entry.trim().split("=");
+    if (!rawKey) {
+      return acc;
+    }
+
+    acc[rawKey] = decodeURIComponent(rawValue.join("=") || "");
+    return acc;
+  }, {});
+}
+
+function getViewerMode(req) {
+  const cookies = parseCookies(req);
+  return cookies[VIEWER_COOKIE_NAME] === "admin" ? "admin" : "worker";
+}
+
+function canViewRevenue(req) {
+  return Boolean(ADMIN_VIEW_CODE) && getViewerMode(req) === "admin";
+}
+
+function setViewerCookie(res, mode) {
+  const attributes = [
+    `${VIEWER_COOKIE_NAME}=${encodeURIComponent(mode)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${60 * 60 * 24 * 30}`
+  ];
+
+  if (process.env.NODE_ENV === "production") {
+    attributes.push("Secure");
+  }
+
+  res.setHeader("Set-Cookie", attributes.join("; "));
+}
+
+function clearViewerCookie(res) {
+  const attributes = [`${VIEWER_COOKIE_NAME}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
+
+  if (process.env.NODE_ENV === "production") {
+    attributes.push("Secure");
+  }
+
+  res.setHeader("Set-Cookie", attributes.join("; "));
+}
+
+function validateStartupEnv() {
+  const missing = [];
+
+  if (!GOOGLE_API_KEY) {
+    missing.push("GOOGLE_API_KEY");
+  }
+
+  if (!SPREADSHEET_ID) {
+    missing.push("SPREADSHEET_ID");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.DATABASE_URL) {
+      missing.push("DATABASE_URL");
+    }
+
+    if (!ADMIN_VIEW_CODE) {
+      missing.push("ADMIN_VIEW_CODE");
+    }
+
+    if (!CORS_ORIGINS.length) {
+      missing.push("CORS_ORIGINS");
+    }
+  }
+
+  if (missing.length) {
+    throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+  }
+}
 
 function assertEnv() {
   if (!GOOGLE_API_KEY || !SPREADSHEET_ID) {
     throw new Error("Missing GOOGLE_API_KEY or SPREADSHEET_ID environment variables.");
   }
 }
+
+validateStartupEnv();
 
 function parseNumber(value) {
   if (value === undefined || value === null || value === "") {
@@ -1119,6 +1225,43 @@ app.get("/api/account", async (_req, res, next) => {
   }
 });
 
+app.get("/api/viewer", (req, res) => {
+  const viewerMode = getViewerMode(req);
+  res.json({
+    viewerMode,
+    canViewRevenue: canViewRevenue(req),
+    adminCodeConfigured: Boolean(ADMIN_VIEW_CODE)
+  });
+});
+
+app.post("/api/viewer/unlock", (req, res) => {
+  const code = String(req.body?.code || req.query?.code || "").trim();
+
+  if (!ADMIN_VIEW_CODE) {
+    return res.status(400).json({ error: "ADMIN_VIEW_CODE is not configured." });
+  }
+
+  if (!code || code !== ADMIN_VIEW_CODE) {
+    return res.status(403).json({ error: "Invalid admin code." });
+  }
+
+  setViewerCookie(res, "admin");
+  return res.json({
+    ok: true,
+    viewerMode: "admin",
+    canViewRevenue: true
+  });
+});
+
+app.post("/api/viewer/lock", (_req, res) => {
+  clearViewerCookie(res);
+  res.json({
+    ok: true,
+    viewerMode: "worker",
+    canViewRevenue: false
+  });
+});
+
 app.get("/api/reels", async (req, res, next) => {
   try {
     const sort = req.query.sort || "postedAt";
@@ -1215,6 +1358,8 @@ app.use(
   "/api/monetization",
   createMonetizationRouter({
     getReelsData,
+    getViewerMode,
+    canViewRevenue,
     getContextualReels: async () => {
       const { reels } = await getFilteredReels({ timeframe: "all" });
       return reels;
@@ -1235,11 +1380,19 @@ app.get("*", (req, res, next) => {
 
 app.use((error, _req, res, _next) => {
   const status = error.response?.status || 500;
-  const details = error.response?.data || error.message;
+  const upstreamDetails = error.response?.data;
+  const message = error.message || "Unexpected server error.";
+  const isProduction = process.env.NODE_ENV === "production";
+
+  console.error("[server-error]", {
+    status,
+    message,
+    upstreamDetails
+  });
 
   res.status(status).json({
     error: "Request failed",
-    details
+    details: isProduction ? "Something went wrong." : upstreamDetails || message
   });
 });
 

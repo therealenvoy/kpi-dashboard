@@ -1,5 +1,5 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
-import { fetchAccount, fetchReels, fetchReport, fetchSnapshotsWithCompare } from "./lib/api";
+import { fetchAccount, fetchReels, fetchReport, fetchSnapshotsWithCompare, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
 import {
   formatCompactNumber,
   formatDateTime,
@@ -17,7 +17,6 @@ import MobileDecisionFeed from "./components/MobileDecisionFeed";
 import ReelModal from "./components/ReelModal";
 import ReelsDecisionSystem from "./components/ReelsDecisionSystem";
 import ReelsTable from "./components/ReelsTable";
-import ReelsOperatorBrief from "./components/ReelsOperatorBrief";
 import ReportPanel from "./components/ReportPanel";
 import TopPerformerBoard from "./components/TopPerformerBoard";
 import WinnersPatterns from "./components/WinnersPatterns";
@@ -85,6 +84,7 @@ export default function App() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [clockTick, setClockTick] = useState(Date.now());
   const [dashboardMode, setDashboardMode] = useState("reels");
+  const [viewerState, setViewerState] = useState({ viewerMode: "worker", canViewRevenue: false, adminCodeConfigured: false });
   const [filters, setFilters] = useState({
     q: "",
     preset: "",
@@ -105,6 +105,53 @@ export default function App() {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    fetchViewer()
+      .then((response) => setViewerState(response))
+      .catch(() => {
+        // Ignore viewer state failures and keep the safe worker default.
+      });
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const adminCode = params.get("admin");
+    const workerMode = params.get("worker");
+
+    if (!adminCode && !workerMode) {
+      return;
+    }
+
+    const cleanUrl = () => {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete("admin");
+      nextParams.delete("worker");
+      const nextQuery = nextParams.toString();
+      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
+      window.history.replaceState({}, "", nextUrl);
+    };
+
+    if (adminCode) {
+      unlockViewer(adminCode)
+        .then((response) => setViewerState((current) => ({ ...current, ...response })))
+        .finally(cleanUrl);
+      return;
+    }
+
+    lockViewer()
+      .then((response) => setViewerState((current) => ({ ...current, ...response })))
+      .finally(cleanUrl);
+  }, []);
+
+  async function handleLockAdminView() {
+    try {
+      const response = await lockViewer();
+      setViewerState((current) => ({ ...current, ...response }));
+    } catch (_error) {
+      // Ignore lock failures and keep current viewer state visible.
+    }
+  }
 
   useEffect(() => {
     if (!refreshMeta?.expiresAt || loading) {
@@ -318,11 +365,27 @@ export default function App() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1520px] flex-col gap-8 px-4 py-5 sm:px-6 lg:px-8">
-      <section className="panel px-4 py-4">
+      <section className="panel px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workspace</p>
-            <p className="mt-1 text-[12px] text-slate-400">Switch between content intelligence and monetization inside the same product.</p>
+            <p className="mt-1 text-[13px] text-slate-300">{account?.username ? `@${account.username}` : "Reels dashboard"}</p>
+            {dashboardMode === "monetization" ? (
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 font-semibold uppercase tracking-[0.08em] text-slate-300">
+                  {viewerState.viewerMode === "admin" ? "Admin mode" : "Worker mode"}
+                </span>
+                {viewerState.viewerMode === "admin" ? (
+                  <button
+                    type="button"
+                    onClick={handleLockAdminView}
+                    className="rounded-full border border-white/8 px-3 py-1 font-semibold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-white/16 hover:text-white"
+                  >
+                    Lock admin
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 text-sm">
             {[
@@ -348,143 +411,126 @@ export default function App() {
         <MonetizationPage />
       ) : (
         <>
-      <section className="hero-shell relative overflow-hidden px-6 py-8 md:px-8 md:py-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_12%,rgba(215,184,120,0.08),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_36%)]" />
-        <div className="relative space-y-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reels intelligence</p>
-              <h1 className="max-w-4xl font-display text-[2.8rem] leading-[0.96] text-white md:text-[5.25rem]">KPI Dashboard</h1>
-              <p className="max-w-2xl text-[13px] leading-6 text-slate-300">
-                A calmer read on what is actually working for {account?.username ? `@${account.username}` : "@itslittlealyson__"}.
-              </p>
-              <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px] text-slate-400">
-                <span>{pagination.total || 0} reels in the current slice</span>
-                <span>{timeframe === "30d" ? "Last 30 days" : "Full archive"}</span>
-                <span>{getRefreshCountdown(refreshMeta?.expiresAt)}</span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 md:items-end">
-              <div className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 text-sm">
-                {["30d", "all"].map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handleTimeframeChange(value)}
-                    className={`rounded-full px-4 py-2 font-semibold transition-colors ${
-                      timeframe === value ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {value === "30d" ? "Last 30 days" : "All time"}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setRefreshNonce((current) => current + 1)}
-                className="text-[12px] text-slate-400 transition-colors hover:text-white"
-              >
-                Refresh this view
-              </button>
-            </div>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <KpiCard
-                  label="Followers"
-                  value={formatCompactNumber(account?.followers)}
-                  helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : ""}
-                  accent="#8fbfff"
-                />
-                <KpiCard
-                  label="Reels in view"
-                  value={formatCompactNumber(summary?.count ?? account?.mediaCount)}
-                  helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Only the latest 30 days" : "Full historical library"}
-                  accent="#9cb0d3"
-                />
-                <KpiCard
-                  label="Avg engagement"
-                  value={formatPercent(summary?.averageEngagementRate)}
-                  helper={
-                    summary?.medianEngagementRate
-                      ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel`
-                      : "Mean engagement rate in the selected view"
-                  }
-                  accent="#c8d2e5"
-                />
-                <KpiCard
-                  label="Avg views / reel"
-                  value={formatCompactNumber(summary?.averageViews)}
-                  helper={
-                    summary?.benchmarks?.previous7dAverageViews
-                      ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort`
-                      : "Average current views per reel"
-                  }
-                  accent="#5875af"
-                />
-              </div>
-              <div className="hero-primary-card px-6 py-5">
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Current views</p>
-                    <p className="mt-2 font-display text-[2.4rem] leading-[0.92] text-white">{formatCompactNumber(summary?.totalViews)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Total likes</p>
-                    <p className="mt-2 font-display text-[2.4rem] leading-[0.92] text-white">{formatCompactNumber(summary?.totalLikes)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Median breakout</p>
-                    <p className="mt-2 font-display text-[2.4rem] leading-[0.92] text-white">{formatCompactNumber(summary?.medianBreakoutScore)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Auto refresh</p>
-                    <p className="mt-2 font-display text-[2.4rem] leading-[0.92] text-white">{refreshMeta?.cacheTtlSeconds ? `${refreshMeta.cacheTtlSeconds / 60}m` : "--"}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="support-card">
-              <div className="mt-6 space-y-4">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Account</p>
-                  <h2 className="mt-2 font-display text-[2rem] leading-[1] text-white">
-                    {account?.username ? `@${account.username}` : "@itslittlealyson__"}
-                  </h2>
-                </div>
-                <div className="border-t border-white/6 pt-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Last refresh</p>
-                  <p className="mt-2 text-[14px] font-semibold text-white">{formatDateTime(account?.lastUpdated || summary?.latestUpdate)}</p>
-                  <p className="mt-1 text-[12px] text-slate-500">{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Mode</p>
-                    <p className="mt-2 text-[14px] font-semibold text-white">{timeframe === "30d" ? "Recent focus" : "Full archive"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Matches</p>
-                    <p className="mt-2 text-[14px] font-semibold text-white">{pagination.total}</p>
-                  </div>
-                </div>
-                <div className="border-t border-white/6 pt-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Overview</p>
-                  <p className="mt-2 text-[12px] leading-6 text-slate-400">
-                    {summary?.count
-                      ? `${formatCompactNumber(summary.count)} reels match the current slice. The strongest breakout is ${formatCompactNumber(
-                          summary.highlights?.breakoutScore?.breakoutScore
-                        )}. ${summary.workflowRoadmap?.find((lane) => lane.key === "scale")?.count || 0} are ready to scale now.`
-                      : "Waiting for live sheet data."}
+          <section className="hero-shell relative overflow-hidden px-6 py-6 md:px-8 md:py-7">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_8%,rgba(215,184,120,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_34%)]" />
+            <div className="relative space-y-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Content intelligence</p>
+                  <p className="text-[13px] leading-6 text-slate-300">
+                    A sharp read on what to repeat next for {account?.username ? `@${account.username}` : "@itslittlealyson__"}.
                   </p>
                 </div>
+                <div className="flex flex-col gap-3 md:items-end">
+                  <div className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 text-sm">
+                    {["30d", "all"].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => handleTimeframeChange(value)}
+                        className={`rounded-full px-4 py-2 font-semibold transition-colors ${
+                          timeframe === value ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {value === "30d" ? "Last 30 days" : "All time"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRefreshNonce((current) => current + 1)}
+                    className="text-[12px] text-slate-400 transition-colors hover:text-white"
+                  >
+                    Refresh this view
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard
+                    label="Followers"
+                    value={formatCompactNumber(account?.followers)}
+                    helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"}
+                    accent="#8fbfff"
+                  />
+                  <KpiCard
+                    label="Reels in view"
+                    value={formatCompactNumber(summary?.count ?? account?.mediaCount)}
+                    helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Latest 30-day slice" : "Full historical library"}
+                    accent="#9cb0d3"
+                  />
+                  <KpiCard
+                    label="Avg engagement"
+                    value={formatPercent(summary?.averageEngagementRate)}
+                    helper={
+                      summary?.medianEngagementRate
+                        ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel`
+                        : "Mean engagement rate in this view"
+                    }
+                    accent="#c8d2e5"
+                  />
+                  <KpiCard
+                    label="Avg views / reel"
+                    value={formatCompactNumber(summary?.averageViews)}
+                    helper={
+                      summary?.benchmarks?.previous7dAverageViews
+                        ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort`
+                        : "Average current views per reel"
+                    }
+                    accent="#5875af"
+                  />
+                </div>
+
+                <div className="support-card">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Account</p>
+                      <h2 className="mt-2 font-display text-[1.8rem] leading-[1] text-white">
+                        {account?.username ? `@${account.username}` : "@itslittlealyson__"}
+                      </h2>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Last refresh</p>
+                        <p className="mt-2 text-[14px] font-semibold text-white">{formatDateTime(account?.lastUpdated || summary?.latestUpdate)}</p>
+                        <p className="mt-1 text-[12px] text-slate-500">{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Overview</p>
+                        <p className="mt-2 text-[12px] leading-6 text-slate-400">
+                          {summary?.count
+                            ? `${summary.workflowRoadmap?.find((lane) => lane.key === "scale")?.count || 0} ready to scale now. ${
+                                summary.workflowRoadmap?.find((lane) => lane.key === "watch")?.count || 0
+                              } still need another read.`
+                            : "Waiting for live sheet data."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Current slice</p>
+                  <p className="mt-2 text-[13px] text-slate-200">{pagination.total || 0} reels in focus</p>
+                </div>
+                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Timeframe</p>
+                  <p className="mt-2 text-[13px] text-slate-200">{timeframe === "30d" ? "Last 30 days" : "Full archive"}</p>
+                </div>
+                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Refresh</p>
+                  <p className="mt-2 text-[13px] text-slate-200">{getRefreshCountdown(refreshMeta?.expiresAt)}</p>
+                </div>
+                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Last updated</p>
+                  <p className="mt-2 text-[13px] text-slate-200">{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
 
       {error ? (
         <section className="panel border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">
@@ -513,12 +559,6 @@ export default function App() {
 
           <section className="hidden space-y-10 md:block">
             <section className="space-y-6">
-              <ReelsOperatorBrief
-                summary={summary}
-                patterns={summary?.winnersPatterns}
-                onSelectReel={handleSelectReel}
-              />
-
               <ReelsDecisionSystem
                 roadmap={summary?.workflowRoadmap || []}
                 executiveSummary={summary?.executiveSummary || []}

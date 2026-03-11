@@ -15,7 +15,7 @@ function getReasonBadges(reasonTags = []) {
   return reasonTags.slice(0, 3);
 }
 
-export default function MonetizationDayDrawer({ payload, onClose }) {
+export default function MonetizationDayDrawer({ payload, onClose, canViewRevenue = true }) {
   if (!payload) {
     return null;
   }
@@ -55,27 +55,31 @@ export default function MonetizationDayDrawer({ payload, onClose }) {
                 {formatCompactNumber(metrics.paidSubs)} paid / {formatCompactNumber(metrics.freeSubs)} free
               </p>
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Revenue</p>
-              <p className="mt-3 font-display text-3xl text-white">{formatCurrency(metrics.earningsTotal)}</p>
-              <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">Total day revenue</p>
-            </div>
+            {canViewRevenue ? (
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Revenue</p>
+                <p className="mt-3 font-display text-3xl text-white">{formatCurrency(metrics.earningsTotal)}</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">Total day revenue</p>
+              </div>
+            ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Subscription revenue</p>
-              <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsSubscribes)}</p>
+          {canViewRevenue ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Subscription revenue</p>
+                <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsSubscribes)}</p>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Message revenue</p>
+                <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsMessages)}</p>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Tip revenue</p>
+                <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsTips)}</p>
+              </div>
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Message revenue</p>
-              <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsMessages)}</p>
-            </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Tip revenue</p>
-              <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsTips)}</p>
-            </div>
-          </div>
+          ) : null}
 
           <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5">
             <div className="flex items-center justify-between gap-3">
@@ -170,8 +174,8 @@ export default function MonetizationDayDrawer({ payload, onClose }) {
             <div className="mt-4 space-y-2 text-sm leading-7 text-slate-300">
               <p>Visit to sub conversion: {formatPercent(metrics.visitToSubConversion)}</p>
               <p>Visit to paid conversion: {formatPercent(metrics.visitToPaidConversion)}</p>
-              <p>Subscription revenue: {formatCurrency(metrics.earningsSubscribes)}</p>
-              <p>Messages + tips: {formatCurrency(metrics.earningsSupport)}</p>
+              {canViewRevenue ? <p>Subscription revenue: {formatCurrency(metrics.earningsSubscribes)}</p> : null}
+              {canViewRevenue ? <p>Messages + tips: {formatCurrency(metrics.earningsSupport)}</p> : null}
             </div>
           </div>
         </div>

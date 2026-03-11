@@ -364,21 +364,141 @@ function buildPatternWinners(aggregatedReels) {
     .filter(Boolean);
 }
 
-function createMonetizationRouter({ getReelsData, getContextualReels }) {
+function redactRevenueFieldsFromRow(row) {
+  if (!row) {
+    return row;
+  }
+
+  return {
+    ...row,
+    earningsTotal: null,
+    earningsSubscribes: null,
+    earningsMessages: null,
+    earningsTips: null,
+    earningsSupport: null
+  };
+}
+
+function redactRevenueFieldsFromReel(reel) {
+  if (!reel) {
+    return reel;
+  }
+
+  return {
+    ...reel,
+    estimatedNetRevenue: null,
+    estimatedSubscriptionRevenue: null
+  };
+}
+
+function redactPatternWinner(pattern) {
+  if (!pattern?.winner) {
+    return pattern;
+  }
+
+  return {
+    ...pattern,
+    winner: {
+      ...pattern.winner,
+      estimatedNetRevenue: null
+    }
+  };
+}
+
+function redactOperatorMetrics(metrics) {
+  if (!metrics) {
+    return metrics;
+  }
+
+  return {
+    ...metrics,
+    revenuePerPaidSub: null,
+    subscriptionRevenuePerPaidSub: null,
+    headline: "Focus on paid subscribers and paid-share quality.",
+    action: "Use paid subs, paid share, and the strongest paid-sub reels to guide the next content decisions."
+  };
+}
+
+function redactSummaryRevenue(summary) {
+  if (!summary) {
+    return summary;
+  }
+
+  return {
+    ...summary,
+    totalRevenue: null,
+    totalSubscriptionRevenue: null,
+    totalMessageRevenue: null,
+    totalTipRevenue: null,
+    currentMonth: summary.currentMonth
+      ? {
+          ...summary.currentMonth,
+          totalRevenue: null,
+          subscriptionRevenue: null,
+          messageRevenue: null,
+          tipRevenue: null
+        }
+      : null,
+    operatorMetrics: redactOperatorMetrics(summary.operatorMetrics),
+    topMoneyReels: [],
+    topPaidSubsReels: (summary.topPaidSubsReels || []).map(redactRevenueFieldsFromReel),
+    patternWinners: (summary.patternWinners || []).map(redactPatternWinner)
+  };
+}
+
+function redactStatusRevenue(status) {
+  if (!status) {
+    return status;
+  }
+
+  const latestSync = status.latestSync
+    ? {
+        ...status.latestSync,
+        details: status.latestSync.details
+          ? {
+              ...status.latestSync.details,
+              revenueCoverage: undefined
+            }
+          : status.latestSync.details
+      }
+    : null;
+
+  return {
+    ...status,
+    latestSync
+  };
+}
+
+function redactDayPayload(payload) {
+  if (!payload) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    metrics: redactRevenueFieldsFromRow(payload.metrics)
+  };
+}
+
+function createMonetizationRouter({ getReelsData, getContextualReels, canViewRevenue, getViewerMode }) {
   const router = express.Router();
 
-  router.get("/status", async (_req, res, next) => {
+  router.get("/status", async (req, res, next) => {
     try {
       const storageMode = getStorageMode();
       const onlyFansConfigured = isOnlyFansConfigured();
       await ensureStoreReady();
       const snapshot = await getStatusSnapshot();
+      const allowRevenue = canViewRevenue ? canViewRevenue(req) : false;
+      const viewerMode = getViewerMode ? getViewerMode(req) : allowRevenue ? "admin" : "worker";
 
-      res.json({
+      const response = {
         enabled: onlyFansConfigured,
         databaseConfigured: storageMode === "postgres",
         storageMode,
         onlyFansConfigured,
+        viewerMode,
+        canViewRevenue: allowRevenue,
         hasData: snapshot.hasData,
         totalRows: snapshot.totalRows,
         latestDate: snapshot.latestDate,
@@ -387,7 +507,9 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
         message: onlyFansConfigured
           ? `Monetization sync is ready using ${storageMode} storage.`
           : "Set ONLYFANS_API_KEY to enable monetization sync."
-      });
+      };
+
+      res.json(allowRevenue ? response : redactStatusRevenue(response));
     } catch (error) {
       next(error);
     }
@@ -430,6 +552,7 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
   router.get("/daily", async (req, res, next) => {
     try {
       await ensureStoreReady();
+      const allowRevenue = canViewRevenue ? canViewRevenue(req) : false;
       const limit = Math.max(1, Math.min(Number(req.query.limit) || 30, 90));
       const offset = Math.max(0, Number(req.query.offset) || 0);
       const [metricsRows, totalCount, summaryTotals, allRows] = await Promise.all([
@@ -462,7 +585,7 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
         .slice(0, 5);
       const patternWinners = buildPatternWinners(aggregatedReels);
 
-      res.json({
+      const response = {
         data,
         summary: {
           ...summaryTotals,
@@ -476,7 +599,17 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
           limit,
           offset
         }
-      });
+      };
+
+      res.json(
+        allowRevenue
+          ? response
+          : {
+              ...response,
+              data: data.map(redactRevenueFieldsFromRow),
+              summary: redactSummaryRevenue(response.summary)
+            }
+      );
     } catch (error) {
       next(error);
     }
@@ -485,6 +618,7 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
   router.get("/day/:date", async (req, res, next) => {
     try {
       await ensureStoreReady();
+      const allowRevenue = canViewRevenue ? canViewRevenue(req) : false;
       const { date } = req.params;
       const metrics = await getDailyMetricByDate(date);
 
@@ -498,7 +632,7 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
       const sourceReels = Array.isArray(reels?.reels) ? reels.reels : reels;
       const likelyDrivers = buildLikelyDrivers(sourceReels, date, metrics);
 
-      res.json({
+      const response = {
         metrics: {
           ...metrics,
           earningsSupport: Number(((metrics.earningsMessages || 0) + (metrics.earningsTips || 0)).toFixed(2)),
@@ -511,7 +645,9 @@ function createMonetizationRouter({ getReelsData, getContextualReels }) {
         },
         countries,
         likelyDrivers
-      });
+      };
+
+      res.json(allowRevenue ? response : redactDayPayload(response));
     } catch (error) {
       next(error);
     }

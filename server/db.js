@@ -6,7 +6,8 @@ let pool;
 let schemaEnsured = false;
 
 function isDatabaseConfigured() {
-  return Boolean(process.env.DATABASE_URL);
+  const value = String(process.env.DATABASE_URL || "").trim();
+  return Boolean(value) && value !== "your_postgres_connection_string";
 }
 
 function getPool() {

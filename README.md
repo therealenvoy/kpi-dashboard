@@ -26,9 +26,13 @@ The Vite dev server proxies `/api` requests to `http://localhost:3000`.
 - `DATABASE_URL` for the monetization module
 - `ONLYFANS_API_KEY` for OnlyFans daily sync
 - `ONLYFANS_ACCOUNT_ID` optional if the API key has more than one connected account
+- `ADMIN_VIEW_CODE` optional unlock code for admin money view
+- `CORS_ORIGINS` comma-separated allowlist for production browser origins
 - `PORT`
 
 Use `.env.example` as the template. The real `.env` is gitignored.
+
+In production, the server now fails fast on startup if `GOOGLE_API_KEY`, `SPREADSHEET_ID`, `DATABASE_URL`, `ADMIN_VIEW_CODE`, or `CORS_ORIGINS` are missing.
 
 ## Monetization MVP
 

@@ -1,7 +1,7 @@
-import { formatCompactNumber, formatCurrency, formatPercent } from "../lib/formatters";
+import { formatCurrency, formatPercent } from "../lib/formatters";
 import SectionHeader from "./SectionHeader";
 
-export default function MonetizationInsights({ metrics, showHeader = true }) {
+export default function MonetizationInsights({ metrics, showHeader = true, canViewRevenue = true }) {
   if (!metrics) {
     return null;
   }
@@ -29,16 +29,33 @@ export default function MonetizationInsights({ metrics, showHeader = true }) {
             <p className="mt-2 font-display text-[2.65rem] leading-[0.92] text-amber-50">{formatPercent(metrics.paidShare)}</p>
             <p className="mt-4 text-[12px] leading-5 text-amber-50/70">Share of current-month subscribers that were paid.</p>
           </div>
-          <div className="money-card rounded-[1.75rem] border p-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100/60">Net / paid sub</p>
-            <p className="mt-2 font-display text-[2.65rem] leading-[0.92] text-amber-50">{formatCurrency(metrics.revenuePerPaidSub)}</p>
-            <p className="mt-4 text-[12px] leading-5 text-amber-50/70">Net earnings generated per paid subscriber this month.</p>
-          </div>
-          <div className="cool-card rounded-[1.75rem] border p-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100/60">Subs rev / paid sub</p>
-            <p className="mt-2 font-display text-[2.65rem] leading-[0.92] text-white">{formatCurrency(metrics.subscriptionRevenuePerPaidSub)}</p>
-            <p className="mt-4 text-[12px] leading-5 text-sky-100/65">Subscription revenue only, normalized by paid subscribers.</p>
-          </div>
+          {canViewRevenue ? (
+            <>
+              <div className="money-card rounded-[1.75rem] border p-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100/60">Net / paid sub</p>
+                <p className="mt-2 font-display text-[2.65rem] leading-[0.92] text-amber-50">{formatCurrency(metrics.revenuePerPaidSub)}</p>
+                <p className="mt-4 text-[12px] leading-5 text-amber-50/70">Net earnings generated per paid subscriber this month.</p>
+              </div>
+              <div className="cool-card rounded-[1.75rem] border p-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100/60">Subs rev / paid sub</p>
+                <p className="mt-2 font-display text-[2.65rem] leading-[0.92] text-white">{formatCurrency(metrics.subscriptionRevenuePerPaidSub)}</p>
+                <p className="mt-4 text-[12px] leading-5 text-sky-100/65">Subscription revenue only, normalized by paid subscribers.</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="money-card rounded-[1.75rem] border p-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100/60">Primary focus</p>
+                <p className="mt-2 font-display text-[2.1rem] leading-[0.92] text-amber-50">Paid subs</p>
+                <p className="mt-4 text-[12px] leading-5 text-amber-50/70">Worker mode removes money and keeps the team focused on buyer volume and quality.</p>
+              </div>
+              <div className="cool-card rounded-[1.75rem] border p-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100/60">Guardrail</p>
+                <p className="mt-2 font-display text-[2.1rem] leading-[0.92] text-white">{formatPercent(metrics.paidShare)}</p>
+                <p className="mt-4 text-[12px] leading-5 text-sky-100/65">Keep paid share healthy while scaling the reels that appear to bring buyers.</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>
