@@ -84,9 +84,9 @@ export default function ReelModal({
   const benchmarkBreakoutMultiplier = benchmarks?.medianBreakoutScore ? reel.breakoutScore / benchmarks.medianBreakoutScore : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
-      <div className="panel max-h-[90vh] w-full max-w-6xl overflow-hidden border-white/15 bg-[linear-gradient(180deg,rgba(143,190,255,0.08),rgba(255,255,255,0.03))]">
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-md">
+      <div className="mx-auto my-4 w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/15 bg-[linear-gradient(180deg,rgba(143,190,255,0.08),rgba(255,255,255,0.03))] shadow-[0_30px_120px_rgba(2,6,23,0.72)]">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-slate-950/80 px-6 py-5 backdrop-blur-md">
           <div>
             <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">Reel drill-down</p>
             <h3 className="mt-1 font-display text-2xl text-white">Performance snapshot</h3>
@@ -100,7 +100,7 @@ export default function ReelModal({
           </button>
         </div>
 
-        <div className="grid gap-6 overflow-y-auto p-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
+        <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
           <div className="space-y-6">
             <div className="rounded-[2rem] border border-white/10 bg-black/20 p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -134,17 +134,17 @@ export default function ReelModal({
             </div>
 
             <div className="panel p-5">
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                <div>
+              <div className="mb-5 space-y-4">
+                <div className="max-w-2xl">
                   <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Benchmark chart</p>
-                  <h4 className="mt-1 font-display text-xl text-white">Views and reach vs median trajectory</h4>
+                  <h4 className="mt-1 font-display text-[1.6rem] leading-tight text-white">Performance trajectory vs age median</h4>
                 </div>
-                <label className="space-y-2">
+                <label className="block max-w-sm space-y-2">
                   <span className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Compare to reel</span>
                   <select
                     value={compareReelId}
                     onChange={(event) => onCompareChange(event.target.value)}
-                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-sky-300/60"
+                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-300/60"
                   >
                     <option value="">No comparison</option>
                     {compareOptions.map((option) => (
@@ -158,39 +158,41 @@ export default function ReelModal({
               {loading ? (
                 <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Loading chart…</div>
               ) : (
-                <ResponsiveContainer width="100%" height={320}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                    <XAxis
-                      dataKey="ageDayBucket"
-                      tickFormatter={(value) => `${value}d`}
-                      tick={{ fill: "#94a3b8", fontSize: 11 }}
-                    />
-                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                    <Tooltip
-                      labelFormatter={(value) => `Age ${value} days`}
-                      formatter={(value) => formatFullNumber(value)}
-                      contentStyle={{
-                        backgroundColor: "#0b111b",
-                        borderColor: "rgba(255,255,255,0.12)",
-                        borderRadius: "16px"
-                      }}
-                    />
-                    <Legend wrapperStyle={{ color: "#e2e8f0" }} />
-                    <Line type="monotone" dataKey="views" name="Views" stroke="#8fbfff" strokeWidth={3} dot={false} />
-                    <Line type="monotone" dataKey="benchmarkViews" name="Benchmark views" stroke="#ffffff" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                    <Line type="monotone" dataKey="reach" name="Reach" stroke="#9dd6c2" strokeWidth={2.5} dot={false} />
-                    <Line type="monotone" dataKey="benchmarkReach" name="Benchmark reach" stroke="#d4d8e2" strokeWidth={2} strokeDasharray="4 4" dot={false} />
-                    {compareReel ? (
-                      <Line type="monotone" dataKey="compareViews" name="Compare views" stroke="#f6a560" strokeWidth={2} dot={false} />
-                    ) : null}
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.02] p-3">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                      <XAxis
+                        dataKey="ageDayBucket"
+                        tickFormatter={(value) => `${value}d`}
+                        tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      />
+                      <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                      <Tooltip
+                        labelFormatter={(value) => `Age ${value} days`}
+                        formatter={(value) => formatFullNumber(value)}
+                        contentStyle={{
+                          backgroundColor: "#0b111b",
+                          borderColor: "rgba(255,255,255,0.12)",
+                          borderRadius: "16px"
+                        }}
+                      />
+                      <Legend wrapperStyle={{ color: "#e2e8f0", paddingTop: "12px" }} />
+                      <Line type="monotone" dataKey="views" name="Views" stroke="#8fbfff" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="benchmarkViews" name="Benchmark views" stroke="#ffffff" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                      <Line type="monotone" dataKey="reach" name="Reach" stroke="#9dd6c2" strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="benchmarkReach" name="Benchmark reach" stroke="#d4d8e2" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                      {compareReel ? (
+                        <Line type="monotone" dataKey="compareViews" name="Compare views" stroke="#f6a560" strokeWidth={2} dot={false} />
+                      ) : null}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 xl:pt-0">
             <div className="grid gap-4 sm:grid-cols-2">
               <Metric label="Posted" value={formatDateTime(reel.postedAt)} helper={`${reel.ageBucket} old`} />
               <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
