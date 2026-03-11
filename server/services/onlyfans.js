@@ -2,12 +2,26 @@ const axios = require("axios");
 
 const ONLYFANS_BASE_URL = "https://app.onlyfansapi.com/api";
 
+function normalizeEnvSecret(name) {
+  const rawValue = String(process.env[name] || "").trim();
+  const withoutPrefix = rawValue.startsWith(`${name}=`) ? rawValue.slice(name.length + 1) : rawValue;
+  const unquoted =
+    (withoutPrefix.startsWith('"') && withoutPrefix.endsWith('"')) ||
+    (withoutPrefix.startsWith("'") && withoutPrefix.endsWith("'"))
+      ? withoutPrefix.slice(1, -1)
+      : withoutPrefix;
+
+  return unquoted.trim();
+}
+
 function isOnlyFansConfigured() {
-  return Boolean(process.env.ONLYFANS_API_KEY);
+  return Boolean(normalizeEnvSecret("ONLYFANS_API_KEY"));
 }
 
 function createOnlyFansClient() {
-  if (!isOnlyFansConfigured()) {
+  const apiKey = normalizeEnvSecret("ONLYFANS_API_KEY");
+
+  if (!apiKey) {
     throw new Error("ONLYFANS_API_KEY is not configured.");
   }
 
@@ -15,7 +29,7 @@ function createOnlyFansClient() {
     baseURL: ONLYFANS_BASE_URL,
     timeout: 30000,
     headers: {
-      Authorization: `Bearer ${process.env.ONLYFANS_API_KEY}`
+      Authorization: `Bearer ${apiKey}`
     }
   });
 }
@@ -124,8 +138,10 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 async function resolveOnlyFansAccountId(client) {
-  if (process.env.ONLYFANS_ACCOUNT_ID) {
-    return process.env.ONLYFANS_ACCOUNT_ID;
+  const configuredAccountId = normalizeEnvSecret("ONLYFANS_ACCOUNT_ID");
+
+  if (configuredAccountId) {
+    return configuredAccountId;
   }
 
   const response = await client.get("/accounts");
