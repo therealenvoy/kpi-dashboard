@@ -11,6 +11,7 @@ const {
   listDailyMetrics
 } = require("../services/monetizationStore");
 const { getJob, listRunningJobs, serializeJob, startMonetizationSyncJob } = require("../services/monetizationJobs");
+const { getAutoSyncSnapshot } = require("../services/monetizationScheduler");
 
 function formatDateKey(value) {
   return new Date(value).toISOString().slice(0, 10);
@@ -497,6 +498,7 @@ function createMonetizationRouter({ getReelsData, getContextualReels, canViewRev
         databaseConfigured: storageMode === "postgres",
         storageMode,
         onlyFansConfigured,
+        autoSync: getAutoSyncSnapshot(),
         viewerMode,
         canViewRevenue: allowRevenue,
         hasData: snapshot.hasData,

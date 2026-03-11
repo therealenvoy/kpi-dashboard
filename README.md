@@ -28,11 +28,17 @@ The Vite dev server proxies `/api` requests to `http://localhost:3000`.
 - `ONLYFANS_ACCOUNT_ID` optional if the API key has more than one connected account
 - `ADMIN_VIEW_CODE` optional unlock code for admin money view
 - `CORS_ORIGINS` comma-separated allowlist for production browser origins
+- `MONETIZATION_AUTO_SYNC` optional, defaults to on in production and off elsewhere
+- `MONETIZATION_AUTO_SYNC_DAYS` optional, defaults to `30`
+- `MONETIZATION_AUTO_SYNC_HOUR_UTC` optional, defaults to `1`
+- `MONETIZATION_AUTO_SYNC_MINUTE_UTC` optional, defaults to `15`
 - `PORT`
 
 Use `.env.example` as the template. The real `.env` is gitignored.
 
 In production, the server now fails fast on startup if `GOOGLE_API_KEY`, `SPREADSHEET_ID`, `ADMIN_VIEW_CODE`, or `CORS_ORIGINS` are missing. If `DATABASE_URL` is absent, monetization falls back to file storage.
+
+Monetization also supports an automatic daily sync in production. It runs once per day for the last 30 days by default, and the manual sync button remains available as a fallback.
 
 ## Monetization MVP
 

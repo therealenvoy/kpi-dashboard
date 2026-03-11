@@ -176,6 +176,11 @@ export default function MonetizationPage() {
                     ? "Use the control room above for the answer. Use the sections below to understand the drivers, formats, and daily details behind it."
                     : "This view hides money and keeps the focus on daily paid subscribers, quality, and the reels most likely bringing buyers."}
                 </p>
+                {status?.autoSync?.enabled ? (
+                  <p className="text-[12px] text-slate-400">
+                    Daily auto-sync is on for the last {status.autoSync.days} days. Manual sync is still available if you want a refresh right now.
+                  </p>
+                ) : null}
                 {notice ? <p className="text-[12px] text-sky-100/72">{notice}</p> : null}
                 {!hasCriticalError && error ? <p className="text-[12px] text-rose-200/80">{error}</p> : null}
               </div>
@@ -185,7 +190,7 @@ export default function MonetizationPage() {
                 disabled={syncing}
                 className="rounded-full bg-sky-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {syncing ? "Syncing…" : "Sync 30 days"}
+                {syncing ? "Syncing…" : "Sync now"}
               </button>
             </div>
           </div>
@@ -200,6 +205,11 @@ export default function MonetizationPage() {
             <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-slate-500">
               Viewer mode: {status?.viewerMode || "worker"} {canViewRevenue ? "· money visible" : "· money hidden"}
             </p>
+            {status?.autoSync?.enabled ? (
+              <p className="mt-3 text-[12px] text-slate-400">
+                Auto-sync runs daily at {status.autoSync.scheduleUtc} for the last {status.autoSync.days} days.
+              </p>
+            ) : null}
             {latestFinishedAt ? (
               <p className="mt-3 text-[12px] text-slate-400">Latest completed sync: {formatDateTime(latestFinishedAt)}</p>
             ) : null}

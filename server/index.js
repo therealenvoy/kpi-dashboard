@@ -6,6 +6,7 @@ const path = require("path");
 const NodeCache = require("node-cache");
 const axios = require("axios");
 const { createMonetizationRouter } = require("./routes/monetization");
+const { startAutoMonetizationScheduler } = require("./services/monetizationScheduler");
 
 const app = express();
 const cache = new NodeCache({ stdTTL: 60 * 60, checkperiod: 120 });
@@ -134,6 +135,7 @@ function assertEnv() {
 }
 
 validateStartupEnv();
+startAutoMonetizationScheduler();
 
 function parseNumber(value) {
   if (value === undefined || value === null || value === "") {
