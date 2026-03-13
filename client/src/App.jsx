@@ -20,6 +20,7 @@ import ReelsTable from "./components/ReelsTable";
 import ReportPanel from "./components/ReportPanel";
 import TopPerformerBoard from "./components/TopPerformerBoard";
 import MonetizationPage from "./pages/MonetizationPage";
+import MonetizationPasswordPrompt from "./components/MonetizationPasswordPrompt";
 
 const PAGE_SIZE = 25;
 
@@ -84,6 +85,8 @@ export default function App() {
   const [clockTick, setClockTick] = useState(Date.now());
   const [dashboardMode, setDashboardMode] = useState("reels");
   const [viewerState, setViewerState] = useState({ viewerMode: "worker", canViewRevenue: false, adminCodeConfigured: false });
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [unlockError, setUnlockError] = useState("");
   const [filters, setFilters] = useState({
     q: "",
     preset: "",
@@ -147,8 +150,31 @@ export default function App() {
     try {
       const response = await lockViewer();
       setViewerState((current) => ({ ...current, ...response }));
+      if (dashboardMode === "monetization") {
+        setDashboardMode("reels");
+      }
     } catch (_error) {
       // Ignore lock failures and keep current viewer state visible.
+    }
+  }
+
+  function handleTabClick(key) {
+    if (key === "monetization" && viewerState.viewerMode !== "admin") {
+      setShowPasswordPrompt(true);
+      return;
+    }
+    setDashboardMode(key);
+  }
+
+  async function handleUnlockSubmit(code) {
+    setUnlockError("");
+    try {
+      const response = await unlockViewer(code);
+      setViewerState((current) => ({ ...current, ...response }));
+      setShowPasswordPrompt(false);
+      setDashboardMode("monetization");
+    } catch (_error) {
+      setUnlockError("Invalid password.");
     }
   }
 
@@ -394,7 +420,7 @@ export default function App() {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setDashboardMode(item.key)}
+                onClick={() => handleTabClick(item.key)}
                 className={`rounded-full px-4 py-2 font-semibold transition-colors ${
                   dashboardMode === item.key ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"
                 }`}
@@ -680,6 +706,13 @@ export default function App() {
           />
         </>
       )}
+      {showPasswordPrompt ? (
+        <MonetizationPasswordPrompt
+          error={unlockError}
+          onSubmit={handleUnlockSubmit}
+          onClose={() => { setShowPasswordPrompt(false); setUnlockError(""); }}
+        />
+      ) : null}
     </main>
   );
 }
