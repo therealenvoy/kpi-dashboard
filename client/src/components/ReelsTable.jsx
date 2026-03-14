@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   formatCompactNumber,
   formatDecisionLabel,
@@ -53,6 +54,51 @@ function SortButton({ column, sort, order, onChange }) {
   );
 }
 
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy(event) {
+    event.stopPropagation();
+    navigator.clipboard.writeText(text || "").then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {
+      // Ignore clipboard failures.
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="rounded-full border border-white/8 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-white/16 hover:text-white"
+    >
+      {copied ? "Copied!" : "Copy caption"}
+    </button>
+  );
+}
+
+function InsightTooltip({ reel }) {
+  const reasons = reel.workflowReasons?.length
+    ? reel.workflowReasons
+    : getReelInsightReasons(reel);
+
+  if (!reasons?.length) {
+    return null;
+  }
+
+  return (
+    <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 rounded-xl border border-white/10 bg-slate-800 px-4 py-3 opacity-0 shadow-xl transition-opacity group-hover/insight:opacity-100">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Why this decision</p>
+      <ul className="space-y-1">
+        {reasons.map((reason, index) => (
+          <li key={index} className="text-[12px] leading-5 text-slate-200">• {reason}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function ReelsTable({
   reels,
   sort,
@@ -94,7 +140,7 @@ export default function ReelsTable({
                 Reach
               </th>
               <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Open
+                Actions
               </th>
             </tr>
           </thead>
@@ -119,9 +165,12 @@ export default function ReelsTable({
                           {formatDecisionLabel(reel.workflowDecision)}
                         </span>
                       </div>
-                      <p className="text-[11px] leading-5 text-slate-500">
-                        {getReelInsightReasons(reel).join(" · ") || reel.workflowAction}
-                      </p>
+                      <div className="group/insight relative">
+                        <p className="cursor-help text-[11px] leading-5 text-slate-500 underline decoration-dotted decoration-slate-600 underline-offset-2">
+                          {getReelInsightReasons(reel).join(" · ") || reel.workflowAction}
+                        </p>
+                        <InsightTooltip reel={reel} />
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -153,9 +202,25 @@ export default function ReelsTable({
                 <td className="px-3 py-4 text-[13px] font-medium text-[#d7b878]">{formatSignedCompactNumber(reel.views24hDelta)}</td>
                 <td className="px-3 py-4 text-[13px] text-slate-300">{formatCompactNumber(reel.reach)}</td>
                 <td className="rounded-r-3xl px-3 py-4">
-                  <div className="flex items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 transition-colors group-hover:text-white">
-                    <span>Open</span>
-                    <span className="text-[12px] text-[#d7b878] transition-transform group-hover:translate-x-0.5">↗</span>
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      {reel.permalink ? (
+                        <a
+                          href={reel.permalink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded-full border border-white/8 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-white/16 hover:text-white"
+                        >
+                          IG ↗
+                        </a>
+                      ) : null}
+                      <CopyButton text={reel.caption} />
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 transition-colors group-hover:text-white">
+                      <span>Open</span>
+                      <span className="text-[12px] text-[#d7b878] transition-transform group-hover:translate-x-0.5">↗</span>
+                    </div>
                   </div>
                 </td>
               </tr>

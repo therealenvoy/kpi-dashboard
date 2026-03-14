@@ -7,6 +7,8 @@ import {
   formatPercent,
   formatRelative
 } from "./lib/formatters";
+import ActionPlanPanel from "./components/ActionPlanPanel";
+import AlertsBanner, { buildAlerts } from "./components/AlertsBanner";
 import CountryBreakdown from "./components/CountryBreakdown";
 import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
 import DashboardFilters from "./components/DashboardFilters";
@@ -87,6 +89,14 @@ export default function App() {
   const [viewerState, setViewerState] = useState({ viewerMode: "worker", canViewRevenue: false, adminCodeConfigured: false });
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [unlockError, setUnlockError] = useState("");
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem("dismissed-alerts");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [filters, setFilters] = useState({
     q: "",
     preset: "",
@@ -376,6 +386,29 @@ export default function App() {
     }
   }
 
+  function handleDismissAlert(reelId) {
+    setDismissedAlerts((current) => {
+      const next = new Set(current);
+      next.add(reelId);
+      try {
+        sessionStorage.setItem("dismissed-alerts", JSON.stringify([...next]));
+      } catch {
+        // Ignore storage failures.
+      }
+      return next;
+    });
+  }
+
+  const allUniqueReels = Object.values(
+    [...tableData, ...Object.values(topLists).flat()].reduce((acc, reel) => {
+      if (reel?.reelId) {
+        acc[reel.reelId] = reel;
+      }
+      return acc;
+    }, {})
+  );
+  const activeAlerts = buildAlerts(allUniqueReels).filter((a) => !dismissedAlerts.has(a.reelId));
+
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
   const showInitialLoading = loading && !hasLoadedOnce;
   const exportUrl = `/api/reels/export.csv?${new URLSearchParams(buildBaseParams(timeframe, filters, deferredQuery)).toString()}`;
@@ -582,22 +615,21 @@ export default function App() {
             onSelectReel={handleSelectReel}
           />
 
-          <section className="hidden space-y-10 md:block">
-            <section className="space-y-6">
-              <ReelsDecisionSystem
-                roadmap={summary?.workflowRoadmap || []}
-                executiveSummary={summary?.executiveSummary || []}
-                onApplyDecision={applyWorkflowDecisionFilter}
-                onSelectReel={handleSelectReel}
-              />
-            </section>
+          <div className="hidden space-y-8 md:block">
+            <AlertsBanner
+              alerts={activeAlerts}
+              onDismiss={handleDismissAlert}
+              onSelectReel={handleSelectReel}
+            />
+
+            <ActionPlanPanel summary={summary} onSelectReel={handleSelectReel} />
 
             <section className="space-y-6 border-t border-white/6 pt-8">
               <div className="space-y-2 px-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Proof</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Top reels</p>
                 <h3 className="font-display text-[1.55rem] leading-[1] text-white md:text-[2rem]">Winners and risks</h3>
                 <p className="max-w-3xl text-[12px] leading-6 text-slate-400">
-                  Use this tier to validate the decision, compare leading reels, and see which examples deserve attention now.
+                  Your leading reels ranked by key metrics. Compare and validate which examples deserve attention.
                 </p>
               </div>
 
@@ -609,56 +641,73 @@ export default function App() {
                 onSelectReel={handleSelectReel}
               />
             </section>
-          </section>
+          </div>
 
           <section className="space-y-8 border-t border-white/6 pt-8">
             <div className="space-y-3 px-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Details</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Deep dive</p>
               <h2 className="font-display text-[1.8rem] leading-[1] text-white md:text-[2.35rem]">Supporting analysis</h2>
               <p className="max-w-3xl text-[13px] leading-6 text-slate-400">
-                This layer is intentionally quieter. Use the table, filters, lifecycle, patterns, and report only when you need to inspect the why behind the top-line call.
+                Expand any section below when you need to dig deeper into the data behind the top-line actions.
               </p>
             </div>
 
-            <DashboardFilters
-              query={filters.q}
-              preset={filters.preset}
-              boosted={filters.boosted}
-              surface={filters.surface}
-              topCountry={filters.topCountry}
-              engagementBand={filters.engagementBand}
-              workflowDecision={filters.workflowDecision}
-              weekday={filters.weekday}
-              minViews={filters.minViews}
-              presets={summary?.presets || []}
-              countryOptions={account?.countries?.map((country) => country.code) || []}
-              resultCount={pagination.total}
-              onQueryChange={(value) => updateFilter("q", value)}
-              onPresetChange={(value) => updateFilter("preset", value)}
-              onBoostedChange={(value) => updateFilter("boosted", value)}
-              onSurfaceChange={(value) => updateFilter("surface", value)}
-              onTopCountryChange={(value) => updateFilter("topCountry", value)}
-              onEngagementBandChange={(value) => updateFilter("engagementBand", value)}
-              onWorkflowDecisionChange={(value) => updateFilter("workflowDecision", value)}
-              onWeekdayChange={(value) => updateFilter("weekday", value)}
-              onMinViewsChange={(value) => updateFilter("minViews", value)}
-              onReset={resetFilters}
-            />
-
-            <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
-            <div className="hidden md:block">
-              <ReelsTable
-                reels={tableData}
-                sort={sort}
-                order={order}
-                onSortChange={handleSortChange}
-                page={page}
-                totalPages={totalPages}
-                totalItems={pagination.total}
-                onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
+            <CollapsibleAnalysisSection
+              title="Decision system"
+              description="The scale / watch / drop framework. Open this to see the full breakdown of which reels fall into each lane."
+            >
+              <ReelsDecisionSystem
+                roadmap={summary?.workflowRoadmap || []}
+                executiveSummary={summary?.executiveSummary || []}
+                onApplyDecision={applyWorkflowDecisionFilter}
                 onSelectReel={handleSelectReel}
               />
-            </div>
+            </CollapsibleAnalysisSection>
+
+            <CollapsibleAnalysisSection
+              title="Full reels table"
+              description="Search, filter, and sort the full library. Use this when you need to find a specific reel or dig into the numbers."
+            >
+              <DashboardFilters
+                query={filters.q}
+                preset={filters.preset}
+                boosted={filters.boosted}
+                surface={filters.surface}
+                topCountry={filters.topCountry}
+                engagementBand={filters.engagementBand}
+                workflowDecision={filters.workflowDecision}
+                weekday={filters.weekday}
+                minViews={filters.minViews}
+                presets={summary?.presets || []}
+                countryOptions={account?.countries?.map((country) => country.code) || []}
+                resultCount={pagination.total}
+                onQueryChange={(value) => updateFilter("q", value)}
+                onPresetChange={(value) => updateFilter("preset", value)}
+                onBoostedChange={(value) => updateFilter("boosted", value)}
+                onSurfaceChange={(value) => updateFilter("surface", value)}
+                onTopCountryChange={(value) => updateFilter("topCountry", value)}
+                onEngagementBandChange={(value) => updateFilter("engagementBand", value)}
+                onWorkflowDecisionChange={(value) => updateFilter("workflowDecision", value)}
+                onWeekdayChange={(value) => updateFilter("weekday", value)}
+                onMinViewsChange={(value) => updateFilter("minViews", value)}
+                onReset={resetFilters}
+              />
+
+              <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
+              <div className="mt-6 hidden md:block">
+                <ReelsTable
+                  reels={tableData}
+                  sort={sort}
+                  order={order}
+                  onSortChange={handleSortChange}
+                  page={page}
+                  totalPages={totalPages}
+                  totalItems={pagination.total}
+                  onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
+                  onSelectReel={handleSelectReel}
+                />
+              </div>
+            </CollapsibleAnalysisSection>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
               <CollapsibleAnalysisSection
