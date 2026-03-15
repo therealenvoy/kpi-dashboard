@@ -428,79 +428,49 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                  <KpiCard
-                    label="Followers"
-                    value={formatCompactNumber(account?.followers)}
-                    helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"}
-                    accent="#8fbfff"
-                  />
-                  <KpiCard
-                    label="Reels in view"
-                    value={formatCompactNumber(summary?.count ?? account?.mediaCount)}
-                    helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Latest 30-day slice" : "Full historical library"}
-                    accent="#9cb0d3"
-                  />
-                  <KpiCard
-                    label="Avg engagement"
-                    value={formatPercent(summary?.averageEngagementRate)}
-                    helper={
-                      summary?.medianEngagementRate
-                        ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel`
-                        : "Mean engagement rate in this view"
-                    }
-                    accent="#c8d2e5"
-                  />
-                  <KpiCard
-                    label="Avg views / reel"
-                    value={formatCompactNumber(summary?.averageViews)}
-                    helper={
-                      summary?.benchmarks?.previous7dAverageViews
-                        ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort`
-                        : "Average current views per reel"
-                    }
-                    accent="#5875af"
-                  />
-                  <KpiCard
-                    label="Paid subs today"
-                    value={formatCompactNumber(paidSubsSummary?.today?.paidSubs)}
-                    helper={
-                      paidSubsSummary?.yesterday?.paidSubs != null
-                        ? `Yesterday: ${formatCompactNumber(paidSubsSummary.yesterday.paidSubs)}`
-                        : "Paid subscriber count"
-                    }
-                    accent="#d4a853"
-                  />
-                </div>
-
-                <div className="support-card">
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Account</p>
-                      <h2 className="mt-2 font-display text-[1.8rem] leading-[1] text-white">
-                        {account?.username ? `@${account.username}` : "@itslittlealyson__"}
-                      </h2>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Last refresh</p>
-                        <p className="mt-2 text-[14px] font-semibold text-white">{formatDateTime(account?.lastUpdated || summary?.latestUpdate)}</p>
-                        <p className="mt-1 text-[12px] text-slate-500">{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Overview</p>
-                        <p className="mt-2 text-[12px] leading-6 text-slate-400">
-                          {summary?.count
-                            ? `${summary.workflowRoadmap?.find((lane) => lane.key === "scale")?.count || 0} ready to scale now. ${
-                                summary.workflowRoadmap?.find((lane) => lane.key === "watch")?.count || 0
-                              } still need another read.`
-                            : "Waiting for live sheet data."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+                <KpiCard
+                  label="Followers"
+                  value={formatCompactNumber(account?.followers)}
+                  helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"}
+                  accent="#8fbfff"
+                />
+                <KpiCard
+                  label="Reels in view"
+                  value={formatCompactNumber(summary?.count ?? account?.mediaCount)}
+                  helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Latest 30-day slice" : "Full historical library"}
+                  accent="#9cb0d3"
+                />
+                <KpiCard
+                  label="Avg engagement"
+                  value={formatPercent(summary?.averageEngagementRate)}
+                  helper={
+                    summary?.medianEngagementRate
+                      ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel`
+                      : "Mean engagement rate in this view"
+                  }
+                  accent="#c8d2e5"
+                />
+                <KpiCard
+                  label="Avg views / reel"
+                  value={formatCompactNumber(summary?.averageViews)}
+                  helper={
+                    summary?.benchmarks?.previous7dAverageViews
+                      ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort`
+                      : "Average current views per reel"
+                  }
+                  accent="#5875af"
+                />
+                <KpiCard
+                  label="Paid subs"
+                  value={formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}
+                  helper={
+                    paidSubsSummary?.previous?.paidSubs != null
+                      ? `Previous day: ${formatCompactNumber(paidSubsSummary.previous.paidSubs)}`
+                      : "Paid subscriber count"
+                  }
+                  accent="#d4a853"
+                />
               </div>
 
               <div className="grid gap-3 md:grid-cols-4">

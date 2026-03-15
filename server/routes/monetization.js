@@ -656,18 +656,16 @@ function createMonetizationRouter({ getReelsData, getContextualReels, canViewRev
   });
 
   // Lightweight paid-subs-only summary (no auth required, no earnings exposed)
+  // Returns the two most recent days with data (not strictly today/yesterday)
   router.get("/paid-subs-summary", async (_req, res, next) => {
     try {
       await ensureStoreReady();
-      const today = new Date().toISOString().slice(0, 10);
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      const [todayRow, yesterdayRow] = await Promise.all([
-        getDailyMetricByDate(today).catch(() => null),
-        getDailyMetricByDate(yesterday).catch(() => null)
-      ]);
+      const rows = await listDailyMetrics(2, 0);
       const pick = (row) =>
         row ? { paidSubs: row.paidSubs || 0, newSubs: row.newSubs || 0, date: row.date } : null;
-      res.json({ today: pick(todayRow), yesterday: pick(yesterdayRow) });
+      const latest = rows[0] || null;
+      const previous = rows[1] || null;
+      res.json({ latest: pick(latest), previous: pick(previous) });
     } catch (error) {
       next(error);
     }
