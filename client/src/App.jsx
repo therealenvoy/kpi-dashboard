@@ -1,5 +1,5 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
-import { fetchAccount, fetchReels, fetchReport, fetchSnapshotsWithCompare, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
+import { fetchAccount, fetchPaidSubsSummary, fetchReels, fetchReport, fetchSnapshotsWithCompare, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
 import {
   formatCompactNumber,
   formatDateTime,
@@ -7,9 +7,6 @@ import {
   formatPercent,
   formatRelative
 } from "./lib/formatters";
-import ActionPlanPanel from "./components/ActionPlanPanel";
-import AlertsBanner, { buildAlerts } from "./components/AlertsBanner";
-import CountryBreakdown from "./components/CountryBreakdown";
 import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
 import DashboardFilters from "./components/DashboardFilters";
 import KpiCard from "./components/KpiCard";
@@ -17,22 +14,12 @@ import LifecycleView from "./components/LifecycleView";
 import MobileReelsBriefing from "./components/MobileReelsBriefing";
 import MobileDecisionFeed from "./components/MobileDecisionFeed";
 import ReelModal from "./components/ReelModal";
-import ReelsDecisionSystem from "./components/ReelsDecisionSystem";
 import ReelsTable from "./components/ReelsTable";
 import ReportPanel from "./components/ReportPanel";
-import TopPerformerBoard from "./components/TopPerformerBoard";
 import MonetizationPage from "./pages/MonetizationPage";
 import MonetizationPasswordPrompt from "./components/MonetizationPasswordPrompt";
 
 const PAGE_SIZE = 25;
-
-const topConfig = [
-  { key: "breakout", label: "Breakout", sort: "breakout", order: "desc", metric: "breakoutScore" },
-  { key: "views", label: "Views", sort: "views", order: "desc", metric: "views" },
-  { key: "engagement", label: "Engagement rate", sort: "engagement", order: "desc", metric: "engagementRate" },
-  { key: "saves", label: "Saves", sort: "saves", order: "desc", metric: "saves" },
-  { key: "shares", label: "Shares", sort: "shares", order: "desc", metric: "shares" }
-];
 
 function buildBaseParams(timeframe, filters, deferredQuery) {
   return {
@@ -73,7 +60,7 @@ export default function App() {
   const [order, setOrder] = useState("desc");
   const [timeframe, setTimeframe] = useState("30d");
   const [page, setPage] = useState(1);
-  const [topLists, setTopLists] = useState({});
+  const [paidSubsSummary, setPaidSubsSummary] = useState(null);
   const [selectedReel, setSelectedReel] = useState(null);
   const [compareReelId, setCompareReelId] = useState("");
   const [snapshotPayload, setSnapshotPayload] = useState({ data: [], compare: null, benchmark: [] });
@@ -81,7 +68,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState("");
-  const [selectedTopMetric, setSelectedTopMetric] = useState("breakout");
   const [refreshMeta, setRefreshMeta] = useState(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [clockTick, setClockTick] = useState(Date.now());
@@ -89,14 +75,6 @@ export default function App() {
   const [viewerState, setViewerState] = useState({ viewerMode: "worker", canViewRevenue: false, adminCodeConfigured: false });
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [unlockError, setUnlockError] = useState("");
-  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
-    try {
-      const stored = sessionStorage.getItem("dismissed-alerts");
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
   const [filters, setFilters] = useState({
     q: "",
     preset: "",
@@ -211,7 +189,7 @@ export default function App() {
 
       try {
         const baseParams = buildBaseParams(timeframe, filters, deferredQuery);
-        const [accountResponse, reelsResponse, reportResponse, ...topResponses] = await Promise.all([
+        const [accountResponse, reelsResponse, reportResponse, paidSubsResponse] = await Promise.all([
           fetchAccount(),
           fetchReels({
             ...baseParams,
@@ -221,31 +199,18 @@ export default function App() {
             offset: (page - 1) * PAGE_SIZE
           }),
           fetchReport(baseParams),
-          ...topConfig.map((config) =>
-            fetchReels({
-              ...baseParams,
-              sort: config.sort,
-              order: config.order,
-              limit: 5,
-              offset: 0
-            })
-          )
+          fetchPaidSubsSummary().catch(() => null)
         ]);
 
         if (ignore) {
           return;
         }
 
-        const listMap = topConfig.reduce((acc, config, index) => {
-          acc[config.key] = topResponses[index].data;
-          return acc;
-        }, {});
-
         setAccount(accountResponse);
         setTableData(reelsResponse.data);
         setSummary(reelsResponse.summary);
         setPagination(reelsResponse.pagination);
-        setTopLists(listMap);
+        setPaidSubsSummary(paidSubsResponse);
         setReport(reportResponse);
         setRefreshMeta(reelsResponse.refresh || accountResponse.refresh || reportResponse.refresh || null);
         setHasLoadedOnce(true);
@@ -341,17 +306,6 @@ export default function App() {
     });
   }
 
-  function applyWorkflowDecisionFilter(value) {
-    setFilters((current) => ({
-      ...current,
-      preset: "",
-      workflowDecision: value
-    }));
-    startTransition(() => {
-      setPage(1);
-    });
-  }
-
   function resetFilters() {
     setFilters({
       q: "",
@@ -386,40 +340,10 @@ export default function App() {
     }
   }
 
-  function handleDismissAlert(reelId) {
-    setDismissedAlerts((current) => {
-      const next = new Set(current);
-      next.add(reelId);
-      try {
-        sessionStorage.setItem("dismissed-alerts", JSON.stringify([...next]));
-      } catch {
-        // Ignore storage failures.
-      }
-      return next;
-    });
-  }
-
-  const allUniqueReels = Object.values(
-    [...tableData, ...Object.values(topLists).flat()].reduce((acc, reel) => {
-      if (reel?.reelId) {
-        acc[reel.reelId] = reel;
-      }
-      return acc;
-    }, {})
-  );
-  const activeAlerts = buildAlerts(allUniqueReels).filter((a) => !dismissedAlerts.has(a.reelId));
-
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
   const showInitialLoading = loading && !hasLoadedOnce;
   const exportUrl = `/api/reels/export.csv?${new URLSearchParams(buildBaseParams(timeframe, filters, deferredQuery)).toString()}`;
-  const compareOptions = Object.values(
-    [...tableData, ...Object.values(topLists).flat()].reduce((acc, reel) => {
-      if (reel && reel.reelId && reel.reelId !== selectedReel?.reelId) {
-        acc[reel.reelId] = reel;
-      }
-      return acc;
-    }, {})
-  );
+  const compareOptions = tableData.filter((reel) => reel?.reelId && reel.reelId !== selectedReel?.reelId);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1520px] flex-col gap-8 px-4 py-5 sm:px-6 lg:px-8">
@@ -505,7 +429,7 @@ export default function App() {
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                   <KpiCard
                     label="Followers"
                     value={formatCompactNumber(account?.followers)}
@@ -537,6 +461,16 @@ export default function App() {
                         : "Average current views per reel"
                     }
                     accent="#5875af"
+                  />
+                  <KpiCard
+                    label="Paid subs today"
+                    value={formatCompactNumber(paidSubsSummary?.today?.paidSubs)}
+                    helper={
+                      paidSubsSummary?.yesterday?.paidSubs != null
+                        ? `Yesterday: ${formatCompactNumber(paidSubsSummary.yesterday.paidSubs)}`
+                        : "Paid subscriber count"
+                    }
+                    accent="#d4a853"
                   />
                 </div>
 
@@ -611,125 +545,63 @@ export default function App() {
 
           <MobileReelsBriefing
             summary={summary}
-            topReels={topLists.breakout || []}
+            topReels={tableData.slice(0, 5)}
             onSelectReel={handleSelectReel}
           />
 
-          <div className="hidden space-y-8 md:block">
-            <AlertsBanner
-              alerts={activeAlerts}
-              onDismiss={handleDismissAlert}
-              onSelectReel={handleSelectReel}
+          <section className="space-y-6 border-t border-white/6 pt-8">
+            <DashboardFilters
+              query={filters.q}
+              preset={filters.preset}
+              boosted={filters.boosted}
+              surface={filters.surface}
+              topCountry={filters.topCountry}
+              engagementBand={filters.engagementBand}
+              workflowDecision={filters.workflowDecision}
+              weekday={filters.weekday}
+              minViews={filters.minViews}
+              presets={summary?.presets || []}
+              countryOptions={account?.countries?.map((country) => country.code) || []}
+              resultCount={pagination.total}
+              onQueryChange={(value) => updateFilter("q", value)}
+              onPresetChange={(value) => updateFilter("preset", value)}
+              onBoostedChange={(value) => updateFilter("boosted", value)}
+              onSurfaceChange={(value) => updateFilter("surface", value)}
+              onTopCountryChange={(value) => updateFilter("topCountry", value)}
+              onEngagementBandChange={(value) => updateFilter("engagementBand", value)}
+              onWorkflowDecisionChange={(value) => updateFilter("workflowDecision", value)}
+              onWeekdayChange={(value) => updateFilter("weekday", value)}
+              onMinViewsChange={(value) => updateFilter("minViews", value)}
+              onReset={resetFilters}
             />
 
-            <ActionPlanPanel summary={summary} onSelectReel={handleSelectReel} />
-
-            <section className="space-y-6 border-t border-white/6 pt-8">
-              <div className="space-y-2 px-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Top reels</p>
-                <h3 className="font-display text-[1.55rem] leading-[1] text-white md:text-[2rem]">Winners and risks</h3>
-                <p className="max-w-3xl text-[12px] leading-6 text-slate-400">
-                  Your leading reels ranked by key metrics. Compare and validate which examples deserve attention.
-                </p>
-              </div>
-
-              <TopPerformerBoard
-                configs={topConfig}
-                reels={topLists[selectedTopMetric] || []}
-                activeMetric={selectedTopMetric}
-                onMetricChange={setSelectedTopMetric}
+            <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
+            <div className="mt-6 hidden md:block">
+              <ReelsTable
+                reels={tableData}
+                sort={sort}
+                order={order}
+                onSortChange={handleSortChange}
+                page={page}
+                totalPages={totalPages}
+                totalItems={pagination.total}
+                onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
                 onSelectReel={handleSelectReel}
               />
-            </section>
-          </div>
-
-          <section className="space-y-8 border-t border-white/6 pt-8">
-            <div className="space-y-3 px-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Deep dive</p>
-              <h2 className="font-display text-[1.8rem] leading-[1] text-white md:text-[2.35rem]">Supporting analysis</h2>
-              <p className="max-w-3xl text-[13px] leading-6 text-slate-400">
-                Expand any section below when you need to dig deeper into the data behind the top-line actions.
-              </p>
             </div>
+          </section>
 
+          <section className="space-y-6">
             <CollapsibleAnalysisSection
-              title="Decision system"
-              description="The scale / watch / drop framework. Open this to see the full breakdown of which reels fall into each lane."
+              title="Lifecycle view"
+              description="Inspect where momentum is building or dying across the reel aging curve."
             >
-              <ReelsDecisionSystem
-                roadmap={summary?.workflowRoadmap || []}
-                executiveSummary={summary?.executiveSummary || []}
-                onApplyDecision={applyWorkflowDecisionFilter}
-                onSelectReel={handleSelectReel}
-              />
+              <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
             </CollapsibleAnalysisSection>
-
-            <CollapsibleAnalysisSection
-              title="Full reels table"
-              description="Search, filter, and sort the full library. Use this when you need to find a specific reel or dig into the numbers."
-            >
-              <DashboardFilters
-                query={filters.q}
-                preset={filters.preset}
-                boosted={filters.boosted}
-                surface={filters.surface}
-                topCountry={filters.topCountry}
-                engagementBand={filters.engagementBand}
-                workflowDecision={filters.workflowDecision}
-                weekday={filters.weekday}
-                minViews={filters.minViews}
-                presets={summary?.presets || []}
-                countryOptions={account?.countries?.map((country) => country.code) || []}
-                resultCount={pagination.total}
-                onQueryChange={(value) => updateFilter("q", value)}
-                onPresetChange={(value) => updateFilter("preset", value)}
-                onBoostedChange={(value) => updateFilter("boosted", value)}
-                onSurfaceChange={(value) => updateFilter("surface", value)}
-                onTopCountryChange={(value) => updateFilter("topCountry", value)}
-                onEngagementBandChange={(value) => updateFilter("engagementBand", value)}
-                onWorkflowDecisionChange={(value) => updateFilter("workflowDecision", value)}
-                onWeekdayChange={(value) => updateFilter("weekday", value)}
-                onMinViewsChange={(value) => updateFilter("minViews", value)}
-                onReset={resetFilters}
-              />
-
-              <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
-              <div className="mt-6 hidden md:block">
-                <ReelsTable
-                  reels={tableData}
-                  sort={sort}
-                  order={order}
-                  onSortChange={handleSortChange}
-                  page={page}
-                  totalPages={totalPages}
-                  totalItems={pagination.total}
-                  onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
-                  onSelectReel={handleSelectReel}
-                />
-              </div>
-            </CollapsibleAnalysisSection>
-
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-              <CollapsibleAnalysisSection
-                title="Lifecycle view"
-                description="Open this when you want to inspect where momentum is building or dying across the reel aging curve."
-              >
-                <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
-              </CollapsibleAnalysisSection>
-
-              {account?.countries?.length ? (
-                <CollapsibleAnalysisSection
-                  title="Country breakdown"
-                  description="Open this only when geography matters for the current decision or distribution plan."
-                >
-                  <CountryBreakdown countries={account.countries} />
-                </CollapsibleAnalysisSection>
-              ) : null}
-            </div>
 
             <CollapsibleAnalysisSection
               title="Operator report"
-              description="Keep this collapsed until you need the full written readout or export summary."
+              description="Full written readout and export summary."
             >
               <ReportPanel report={report} onCopySummary={handleCopySummary} exportUrl={exportUrl} />
             </CollapsibleAnalysisSection>

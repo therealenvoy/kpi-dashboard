@@ -655,6 +655,24 @@ function createMonetizationRouter({ getReelsData, getContextualReels, canViewRev
     }
   });
 
+  // Lightweight paid-subs-only summary (no auth required, no earnings exposed)
+  router.get("/paid-subs-summary", async (_req, res, next) => {
+    try {
+      await ensureStoreReady();
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const [todayRow, yesterdayRow] = await Promise.all([
+        getDailyMetricByDate(today).catch(() => null),
+        getDailyMetricByDate(yesterday).catch(() => null)
+      ]);
+      const pick = (row) =>
+        row ? { paidSubs: row.paidSubs || 0, newSubs: row.newSubs || 0, date: row.date } : null;
+      res.json({ today: pick(todayRow), yesterday: pick(yesterdayRow) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
 

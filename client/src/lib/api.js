@@ -52,6 +52,11 @@ export async function lockViewer() {
   return data;
 }
 
+export async function fetchPaidSubsSummary() {
+  const { data } = await api.get("/monetization/paid-subs-summary");
+  return data;
+}
+
 export async function fetchMonetizationDaily(params) {
   const { data } = await api.get("/monetization/daily", { params });
   return data;
