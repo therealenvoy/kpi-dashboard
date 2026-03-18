@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { formatDateTime, formatRelative } from "../lib/formatters";
+import { formatCompactNumber, formatCurrency, formatDate, formatFullNumber, formatPercent, formatRelative, truncate } from "../lib/formatters";
 import {
   fetchMonetizationDaily,
   fetchMonetizationDay,
@@ -7,15 +7,16 @@ import {
   fetchMonetizationSyncJob,
   syncMonetization
 } from "../lib/api";
-import MonetizationCommandCenter from "../components/MonetizationCommandCenter";
-import MonetizationInsights from "../components/MonetizationInsights";
-import MonetizationDailyTable from "../components/MonetizationDailyTable";
 import MonetizationDayDrawer from "../components/MonetizationDayDrawer";
-import PatternWinnersBoard from "../components/PatternWinnersBoard";
-import TopMoneyReels from "../components/TopMoneyReels";
-import TopPaidSubsReels from "../components/TopPaidSubsReels";
-import SectionHeader from "../components/SectionHeader";
+import ReelThumbnail from "../components/ReelThumbnail";
 import MobileBriefingMode from "../components/MobileBriefingMode";
+
+function getVerdictTone(metrics) {
+  if (!metrics) return "text-slate-400";
+  if (metrics.paidShare >= 20) return "text-emerald-300";
+  if (metrics.paidShare >= 15) return "text-amber-200";
+  return "text-rose-300";
+}
 
 export default function MonetizationPage() {
   const pollTimeoutRef = useRef(null);
@@ -30,17 +31,11 @@ export default function MonetizationPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncJob, setSyncJob] = useState(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   async function loadData(options = {}) {
     const background = options.background || hasLoadedRef.current;
-
-    if (background) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
+    if (background) setRefreshing(true);
+    else setLoading(true);
     try {
       const [statusResponse, dailyResponse] = await Promise.all([fetchMonetizationStatus(), fetchMonetizationDaily({ limit: 30 })]);
       setStatus(statusResponse);
@@ -49,212 +44,130 @@ export default function MonetizationPage() {
       setDaily(dailyResponse.data || []);
       setSummary(dailyResponse.summary || null);
       hasLoadedRef.current = true;
-    } catch (requestError) {
-      setError(requestError.response?.data?.details?.error?.message || requestError.message || "Unable to load monetization.");
+    } catch (err) {
+      setError(err.response?.data?.details?.error?.message || err.message || "Unable to load monetization.");
     } finally {
-      if (background) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+      if (background) setRefreshing(false);
+      else setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
-    if (!selectedDate) {
-      return;
-    }
-
-    fetchMonetizationDay(selectedDate)
-      .then((response) => setSelectedDay(response))
-      .catch(() => setSelectedDay(null));
+    if (!selectedDate) return;
+    fetchMonetizationDay(selectedDate).then(setSelectedDay).catch(() => setSelectedDay(null));
   }, [selectedDate]);
 
   useEffect(() => {
-    if (!syncJob?.id || syncJob.status !== "running") {
-      return undefined;
-    }
-
+    if (!syncJob?.id || syncJob.status !== "running") return undefined;
     pollTimeoutRef.current = window.setTimeout(async () => {
       try {
         const response = await fetchMonetizationSyncJob(syncJob.id);
         const nextJob = response.job;
         setSyncJob(nextJob);
-
-        if (nextJob.status === "success") {
-          setSyncing(false);
-          setNotice("Fresh monetization data is ready.");
-          await loadData({ background: true });
-        } else if (nextJob.status === "failed") {
-          setSyncing(false);
-          setError(nextJob.error?.message || "Sync failed.");
-        }
-      } catch (requestError) {
-        setSyncing(false);
-        setError(requestError.response?.data?.error || requestError.message || "Unable to check sync status.");
-      }
+        if (nextJob.status === "success") { setSyncing(false); await loadData({ background: true }); }
+        else if (nextJob.status === "failed") { setSyncing(false); setError(nextJob.error?.message || "Sync failed."); }
+      } catch (err) { setSyncing(false); setError(err.message || "Sync check failed."); }
     }, 2000);
-
-    return () => {
-      if (pollTimeoutRef.current) {
-        window.clearTimeout(pollTimeoutRef.current);
-      }
-    };
+    return () => { if (pollTimeoutRef.current) window.clearTimeout(pollTimeoutRef.current); };
   }, [syncJob]);
 
   async function handleSync() {
     setSyncing(true);
-    setNotice("Sync started. The page will refresh in place when the new snapshot is ready.");
-
     try {
       const response = await syncMonetization({ days: 30 });
       setSyncJob(response.job || null);
-
-      if (response.job?.status === "success") {
-        setSyncing(false);
-        setNotice("Fresh monetization data is ready.");
-        await loadData({ background: true });
-      } else if (response.job?.status === "failed") {
-        setSyncing(false);
-        setError(response.job.error?.message || "Sync failed.");
-      }
-    } catch (requestError) {
-      setError(requestError.response?.data?.details?.error?.message || requestError.message || "Sync failed.");
-      setSyncing(false);
-    }
+      if (response.job?.status === "success") { setSyncing(false); await loadData({ background: true }); }
+      else if (response.job?.status === "failed") { setSyncing(false); setError(response.job.error?.message || "Sync failed."); }
+    } catch (err) { setError(err.message || "Sync failed."); setSyncing(false); }
   }
 
   const currentMonth = summary?.currentMonth;
-  const topPaidReel = summary?.topPaidSubsReels?.[0] || null;
-  const topPattern = summary?.patternWinners?.[0] || null;
+  const metrics = summary?.operatorMetrics;
+  const canViewRevenue = Boolean(status?.canViewRevenue);
   const latestFinishedAt = status?.latestSync?.finished_at || syncJob?.finishedAt || null;
   const hasCriticalError = Boolean(error && !summary && !daily.length && !loading);
-  const canViewRevenue = Boolean(status?.canViewRevenue);
+  const topDrivers = summary?.topPaidSubsReels || [];
 
   return (
-    <div className="space-y-8">
-      {syncing || refreshing ? (
-        <div className="progress-slim fixed inset-x-0 top-0 z-40 h-[2px] bg-white/[0.04]" aria-hidden="true" />
-      ) : null}
+    <div className="space-y-6">
+      {(syncing || refreshing) && <div className="progress-slim fixed inset-x-0 top-0 z-40 h-[2px] bg-white/[0.04]" aria-hidden="true" />}
 
-      <section className="space-y-4">
-        <div className="hidden md:block">
-          <MonetizationCommandCenter
-            currentMonth={currentMonth}
-            metrics={summary?.operatorMetrics}
-            topPaidReel={topPaidReel}
-            topPattern={topPattern}
-            canViewRevenue={canViewRevenue}
-          />
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <div className="panel px-6 py-6 md:px-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Monetization</p>
-                  {latestFinishedAt ? (
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1">
-                      <span className="status-pulse relative inline-flex h-2 w-2 rounded-full bg-emerald-300 text-emerald-300" />
-                      <span className="text-[11px] text-slate-300">Last updated {formatRelative(latestFinishedAt)}</span>
-                    </div>
-                  ) : null}
-                  {refreshing ? (
-                    <span className="text-[11px] text-sky-100/75">Refreshing in place…</span>
-                  ) : null}
-                </div>
-                <h1 className="font-display text-[1.75rem] leading-tight text-white md:text-[2.45rem]">
-                  {canViewRevenue ? "Daily revenue board" : "Daily subscriber board"}
-                </h1>
-                <p className="max-w-2xl text-[13px] leading-6 text-slate-300">
-                  {canViewRevenue
-                    ? "Use the control room above for the answer. Use the sections below to understand the drivers, formats, and daily details behind it."
-                    : "This view hides money and keeps the focus on daily paid subscribers, quality, and the reels most likely bringing buyers."}
-                </p>
-                {status?.autoSync?.enabled ? (
-                  <p className="text-[12px] text-slate-400">
-                    Daily auto-sync is on for the last {status.autoSync.days} days. Manual sync is still available if you want a refresh right now.
-                  </p>
-                ) : null}
-                {notice ? <p className="text-[12px] text-sky-100/72">{notice}</p> : null}
-                {!hasCriticalError && error ? <p className="text-[12px] text-rose-200/80">{error}</p> : null}
-              </div>
-              <button
-                type="button"
-                onClick={handleSync}
-                disabled={syncing}
-                className="rounded-full bg-sky-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-opacity hover:opacity-90 disabled:opacity-60"
-              >
+      {/* Hero: 3 KPI cards + status */}
+      <section className="hero-shell relative overflow-hidden px-6 py-5 md:px-8 md:py-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_12%,rgba(215,184,120,0.1),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_36%)]" />
+        <div className="relative space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1">
+              <p className="text-[13px] font-medium text-slate-200">
+                {canViewRevenue ? "Revenue dashboard" : "Subscriber dashboard"}
+              </p>
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${getVerdictTone(metrics)}`}>
+                {!metrics ? "Waiting for data" : metrics.paidShare >= 20 ? "Healthy month" : metrics.paidShare >= 15 ? "Mixed signals" : "Quality too soft"}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={handleSync} disabled={syncing}
+                className="rounded-full bg-sky-300 px-4 py-2 text-[12px] font-semibold text-slate-950 transition-opacity hover:opacity-90 disabled:opacity-60">
                 {syncing ? "Syncing…" : "Sync now"}
               </button>
+              {latestFinishedAt && <span className="text-[11px] text-slate-500">Updated {formatRelative(latestFinishedAt)}</span>}
             </div>
           </div>
 
-          <div className="panel hidden px-6 py-6 md:block">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">System</p>
-            <p className="mt-3 text-[13px] leading-6 text-slate-300">
-              {status?.enabled
-                ? `Monetization sync is configured. Latest stored day: ${status.latestDate || "none yet"}.`
-                : status?.message || "Set DATABASE_URL and ONLYFANS_API_KEY to enable this module."}
-            </p>
-            <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-slate-500">
-              Viewer mode: {status?.viewerMode || "worker"} {canViewRevenue ? "· money visible" : "· money hidden"}
-            </p>
-            {status?.autoSync?.enabled ? (
-              <p className="mt-3 text-[12px] text-slate-400">
-                Auto-sync runs daily at {status.autoSync.scheduleUtc} for the last {status.autoSync.days} days.
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/60">This month</p>
+              <p className="mt-2 font-display text-[1.6rem] leading-[1] text-white">
+                {canViewRevenue ? formatCurrency(currentMonth?.totalRevenue) : formatFullNumber(currentMonth?.totalPaidSubs)}
               </p>
-            ) : null}
-            {latestFinishedAt ? (
-              <p className="mt-3 text-[12px] text-slate-400">Latest completed sync: {formatDateTime(latestFinishedAt)}</p>
-            ) : null}
-            {syncJob?.status === "running" ? (
-              <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-sky-200">
-                Background sync running for {syncJob.payload?.startDate} to {syncJob.payload?.endDate}
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                {canViewRevenue ? `${formatFullNumber(currentMonth?.totalPaidSubs)} paid subs` : `${formatFullNumber(currentMonth?.totalNewSubs)} new subs total`}
               </p>
-            ) : null}
-            {status?.latestSync?.details?.metricCoverage ? (
-              <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-slate-500">
-                Paid/free coverage: {status.latestSync.details.metricCoverage.completedDays}/
-                {status.latestSync.details.metricCoverage.requestedDays} days on the last sync
+            </div>
+            <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400/60">Paid share</p>
+              <p className="mt-2 font-display text-[1.6rem] leading-[1] text-white">{formatPercent(metrics?.paidShare)}</p>
+              <p className="mt-1.5 text-[11px] text-slate-500">{formatFullNumber(currentMonth?.totalPaidSubs)} paid / {formatFullNumber(currentMonth?.totalFreeSubs)} free</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/60">
+                {canViewRevenue ? "Rev / paid sub" : "New subs today"}
               </p>
-            ) : null}
-            {canViewRevenue && status?.latestSync?.details?.revenueCoverage ? (
-              <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-slate-500">
-                Revenue split:
-                {status.latestSync.details.revenueCoverage.total ? " total" : " total fallback"}
-                {" · "}
-                {status.latestSync.details.revenueCoverage.messages ? "messages" : "messages unavailable"}
-                {" · "}
-                {status.latestSync.details.revenueCoverage.tips ? "tips" : "tips unavailable"}
+              <p className="mt-2 font-display text-[1.6rem] leading-[1] text-white">
+                {canViewRevenue ? formatCurrency(metrics?.revenuePerPaidSub) : formatCompactNumber(daily[0]?.newSubs)}
               </p>
-            ) : null}
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                {canViewRevenue ? "Average revenue per paying subscriber" : `${formatCompactNumber(daily[0]?.paidSubs)} paid today`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+            <span>{daily.length} days loaded</span>
+            {status?.autoSync?.enabled && <span>Auto-sync daily at {status.autoSync.scheduleUtc}</span>}
+            {error && !hasCriticalError && <span className="text-rose-300">{error}</span>}
           </div>
         </div>
       </section>
 
-      {hasCriticalError ? (
+      {hasCriticalError && (
         <section className="panel border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">
           <p className="font-semibold">Monetization module error.</p>
           <p className="mt-2 text-rose-100/80">{error}</p>
         </section>
-      ) : null}
+      )}
 
       {loading ? (
-        <section className="panel flex min-h-[280px] items-center justify-center p-6 text-sm text-slate-400">
+        <section className="panel flex min-h-[200px] items-center justify-center p-6 text-sm text-slate-400">
           Loading monetization metrics…
         </section>
       ) : (
         <>
           <MobileBriefingMode
-            currentMonth={currentMonth}
-            metrics={summary?.operatorMetrics}
-            topPaidReel={topPaidReel}
+            currentMonth={currentMonth} metrics={metrics}
+            topPaidReel={topDrivers[0] || null}
             topMoneyReels={summary?.topMoneyReels}
             patternWinners={summary?.patternWinners}
             canViewRevenue={canViewRevenue}
@@ -262,63 +175,70 @@ export default function MonetizationPage() {
             latestDate={status?.latestDate}
           />
 
-          <section className="hidden space-y-4 md:block">
-            <SectionHeader
-              eyebrow="Health"
-              title="Are we having a good month?"
-              description="This zone reduces the month to signal quality, subscriber quality, and the one operating read that matters right now."
-            />
-            <MonetizationInsights metrics={summary?.operatorMetrics} showHeader={false} canViewRevenue={canViewRevenue} />
-          </section>
+          {/* Top drivers — unified list */}
+          {topDrivers.length > 0 && (
+            <section className="hidden space-y-3 md:block">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Top reel drivers this month</p>
+              <div className="space-y-2">
+                {topDrivers.slice(0, 5).map((reel, index) => (
+                  <div key={reel.reelId} className="flex items-center gap-4 rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+                    <span className="w-6 text-center font-display text-lg text-slate-500">{index + 1}</span>
+                    <ReelThumbnail reel={reel} className="h-12 w-9 shrink-0 rounded-lg" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium leading-5 text-slate-100">{truncate(reel.caption, 70)}</p>
+                      <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-slate-500">
+                        <span className="text-amber-300">{reel.estimatedPaidSubs} paid subs</span>
+                        <span>Paid share {reel.paidShare}%</span>
+                        {canViewRevenue && <span>{formatCurrency(reel.estimatedNetRevenue)} rev</span>}
+                      </div>
+                    </div>
+                    {reel.permalink && (
+                      <a href={reel.permalink} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 text-[11px] text-slate-500 transition-colors hover:text-white">IG ↗</a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
-          <section className="hidden space-y-4 md:block">
-            <SectionHeader
-              eyebrow="Drivers"
-              title="Which reels are actually moving buyers?"
-              description={
-                canViewRevenue
-                  ? "Read these as ranked decisions. One board shows which reels appear to create paid subscribers. The other shows which ones appear to create money."
-                  : "Read these as ranked decisions. This view keeps the focus on paid-subscriber pressure, not revenue."
-              }
-            />
-            <div className={`grid gap-4 ${canViewRevenue ? "2xl:grid-cols-2" : ""}`}>
-              <TopPaidSubsReels reels={summary?.topPaidSubsReels} showHeader={false} />
-              {canViewRevenue ? <TopMoneyReels reels={summary?.topMoneyReels} showHeader={false} /> : null}
+          {/* Daily table — slim columns */}
+          <section className="hidden space-y-3 md:block">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Daily breakdown — click any day to drill down</p>
+            <div className="table-scroll overflow-x-auto">
+              <table className="min-w-full border-separate border-spacing-y-1.5">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Date</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Visits</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">New subs</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Paid</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Free</th>
+                    {canViewRevenue && <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Revenue</th>}
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">Conv %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {daily.map((row) => (
+                    <tr key={row.date} onClick={() => setSelectedDate(row.date)} className="drilldown-row cursor-pointer rounded-3xl transition-colors">
+                      <td className="rounded-l-3xl px-3 py-3 text-[13px] font-semibold text-white">{formatDate(row.date)}</td>
+                      <td className="px-3 py-3 text-[13px] text-slate-400">{formatCompactNumber(row.profileVisitsTotal)}</td>
+                      <td className="px-3 py-3 text-[13px] text-slate-300">{formatCompactNumber(row.newSubs)}</td>
+                      <td className="px-3 py-3 text-[13px] font-semibold text-amber-200">{formatCompactNumber(row.paidSubs)}</td>
+                      <td className="px-3 py-3 text-[13px] text-slate-500">{formatCompactNumber(row.freeSubs)}</td>
+                      {canViewRevenue && <td className="px-3 py-3 text-[13px] font-semibold text-amber-100">{formatCurrency(row.earningsTotal)}</td>}
+                      <td className="rounded-r-3xl px-3 py-3 text-[13px] text-slate-400">{formatPercent(row.visitToPaidConversion)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
-
-          <section className="hidden space-y-4 md:block">
-            <SectionHeader
-              eyebrow="Patterns"
-              title="What format is winning this month?"
-              description={
-                canViewRevenue
-                  ? "This is the scaling layer. Use it to repeat the formats that are producing paid subscribers and net revenue, not just spikes in attention."
-                  : "This is the scaling layer. Use it to repeat the formats that are producing paid subscribers, not just spikes in attention."
-              }
-            />
-            <PatternWinnersBoard patterns={summary?.patternWinners} showHeader={false} canViewRevenue={canViewRevenue} />
-          </section>
-
-          <section className="hidden space-y-4 md:block">
-            <SectionHeader
-              eyebrow="Daily Detail"
-              title="Forensic detail, only when you need it."
-              description="This is intentionally quieter. Use it after the higher-level answers above, when you want to inspect a single day and open the reel-driver drill-down."
-            />
-            <MonetizationDailyTable rows={daily} onSelectDay={setSelectedDate} canViewRevenue={canViewRevenue} />
           </section>
         </>
       )}
 
-      <MonetizationDayDrawer
-        payload={selectedDay}
-        canViewRevenue={canViewRevenue}
-        onClose={() => {
-          setSelectedDate("");
-          setSelectedDay(null);
-        }}
-      />
+      <MonetizationDayDrawer payload={selectedDay} canViewRevenue={canViewRevenue}
+        onClose={() => { setSelectedDate(""); setSelectedDay(null); }} />
     </div>
   );
 }

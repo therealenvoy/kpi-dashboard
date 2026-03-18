@@ -2,181 +2,111 @@ import { formatCompactNumber, formatCurrency, formatDate, formatPercent, truncat
 import ReelThumbnail from "./ReelThumbnail";
 
 function getConfidenceTone(confidence) {
-  if (confidence === "high") {
-    return "text-emerald-200 bg-emerald-500/12 ring-1 ring-emerald-400/25";
-  }
-  if (confidence === "low") {
-    return "text-rose-200 bg-rose-500/12 ring-1 ring-rose-400/25";
-  }
-  return "text-amber-100 bg-amber-500/12 ring-1 ring-amber-300/20";
-}
-
-function getReasonBadges(reasonTags = []) {
-  return reasonTags.slice(0, 3);
+  if (confidence === "high") return "text-emerald-300 bg-emerald-500/12";
+  if (confidence === "low") return "text-rose-300 bg-rose-500/12";
+  return "text-amber-200 bg-amber-500/12";
 }
 
 export default function MonetizationDayDrawer({ payload, onClose, canViewRevenue = true }) {
-  if (!payload) {
-    return null;
-  }
+  if (!payload) return null;
 
   const { metrics, countries, likelyDrivers } = payload;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 p-4 backdrop-blur-md">
-      <div className="panel flex h-full w-full max-w-2xl flex-col overflow-hidden border-white/15">
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+      <div className="panel flex h-full w-full max-w-xl flex-col overflow-hidden border-white/15">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">Day drill-down</p>
-            <h3 className="mt-1 font-display text-2xl text-white">{formatDate(metrics.date)}</h3>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Day detail</p>
+            <h3 className="mt-1 font-display text-xl text-white">{formatDate(metrics.date)}</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:border-white/30 hover:text-white"
-          >
+          <button type="button" onClick={onClose}
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:border-white/30 hover:text-white">
             Close
           </button>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto p-6">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Visits</p>
-              <p className="mt-3 font-display text-3xl text-white">{formatCompactNumber(metrics.profileVisitsTotal)}</p>
+        <div className="flex-1 space-y-5 overflow-y-auto p-5">
+          {/* Metrics strip */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Visits</p>
+              <p className="mt-1 font-display text-2xl text-white">{formatCompactNumber(metrics.profileVisitsTotal)}</p>
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">New subs</p>
-              <p className="mt-3 font-display text-3xl text-white">{formatCompactNumber(metrics.newSubs)}</p>
+            <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">New subs</p>
+              <p className="mt-1 font-display text-2xl text-white">{formatCompactNumber(metrics.newSubs)}</p>
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Paid vs free</p>
-              <p className="mt-3 text-lg font-semibold text-white">
-                {formatCompactNumber(metrics.paidSubs)} paid / {formatCompactNumber(metrics.freeSubs)} free
+            <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Paid / Free</p>
+              <p className="mt-1 text-sm font-semibold text-white">
+                {formatCompactNumber(metrics.paidSubs)} <span className="text-slate-500">/</span> {formatCompactNumber(metrics.freeSubs)}
               </p>
             </div>
-            {canViewRevenue ? (
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Revenue</p>
-                <p className="mt-3 font-display text-3xl text-white">{formatCurrency(metrics.earningsTotal)}</p>
-                <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">Total day revenue</p>
-              </div>
-            ) : null}
+            <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                {canViewRevenue ? "Revenue" : "Conversion"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white">
+                {canViewRevenue ? formatCurrency(metrics.earningsTotal) : formatPercent(metrics.visitToPaidConversion)}
+              </p>
+            </div>
           </div>
 
-          {canViewRevenue ? (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Subscription revenue</p>
-                <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsSubscribes)}</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Message revenue</p>
-                <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsMessages)}</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Tip revenue</p>
-                <p className="mt-3 text-lg font-semibold text-white">{formatCurrency(metrics.earningsTips)}</p>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Likely reel drivers</p>
-                <p className="mt-2 text-sm text-slate-300">
-                  A 72h weighted model using age-adjusted breakout, share/save intent, workflow score, and recency. This is directional,
-                  not deterministic attribution.
-                </p>
-              </div>
-              <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold capitalize ${getConfidenceTone(likelyDrivers.confidence)}`}>
-                {likelyDrivers.confidence} confidence
+          {/* Likely drivers — compact */}
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Likely reel drivers</p>
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${getConfidenceTone(likelyDrivers.confidence)}`}>
+                {likelyDrivers.confidence}
               </span>
             </div>
 
-            <p className="mt-4 text-xs uppercase tracking-[0.18em] text-slate-500">
-              {formatCompactNumber(likelyDrivers.candidateCount || 0)} reels were active in the 72h attribution window
-            </p>
-
-            <div className="mt-5 space-y-3">
+            <div className="mt-3 space-y-2">
               {likelyDrivers.reels.length ? (
-                likelyDrivers.reels.map((reel) => (
-                  <article key={`${metrics.date}-${reel.reelId}`} className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-                    <div className="flex gap-4">
-                      <ReelThumbnail reel={reel} className="h-20 w-16 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-sm leading-6 text-slate-100">{truncate(reel.caption, 90)}</p>
-                            <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-500">{formatDate(reel.postedAt)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-display text-2xl text-white">{reel.attributionShare}%</p>
-                            <p className="text-xs uppercase tracking-[0.12em] text-slate-500">share</p>
-                          </div>
-                        </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                          <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Est. visits</p>
-                            <p className="mt-1 text-sm font-semibold text-white">{formatCompactNumber(reel.estimatedVisitPressure)}</p>
-                          </div>
-                          <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Est. subs</p>
-                            <p className="mt-1 text-sm font-semibold text-white">{reel.estimatedSubPressure}</p>
-                          </div>
-                          <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Est. paid</p>
-                            <p className="mt-1 text-sm font-semibold text-white">{reel.estimatedPaidPressure}</p>
-                          </div>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-slate-400">{reel.reason}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {getReasonBadges(reel.reasonTags).map((tag) => (
-                            <span
-                              key={`${reel.reelId}-${tag}`}
-                              className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
+                likelyDrivers.reels.slice(0, 3).map((reel) => (
+                  <div key={`${metrics.date}-${reel.reelId}`} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                    <ReelThumbnail reel={reel} className="h-12 w-9 shrink-0 rounded-lg" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] leading-5 text-slate-200">{truncate(reel.caption, 60)}</p>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                        {reel.reasonTags?.slice(0, 2).map((tag) => (
+                          <span key={`${reel.reelId}-${tag}`} className="rounded-full border border-white/8 px-2 py-0.5">{tag}</span>
+                        ))}
                       </div>
                     </div>
-                  </article>
-                ))
-              ) : (
-                <p className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-slate-400">
-                  No reels were active in the 72h window for this day.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Visitor countries</p>
-            <div className="mt-4 space-y-3">
-              {countries.length ? (
-                countries.map((country) => (
-                  <div key={country.countryCode} className="flex items-center justify-between text-sm text-slate-300">
-                    <span>{country.countryCode}</span>
-                    <span>{formatCompactNumber(country.visits)} visits</span>
+                    <div className="shrink-0 text-right">
+                      <p className="font-display text-lg text-amber-300">{reel.attributionShare}%</p>
+                      <p className="text-[9px] uppercase text-slate-500">share</p>
+                    </div>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">No stored country snapshot for this day yet.</p>
+                <p className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-4 text-[12px] text-slate-500">No reels active in the 72h window.</p>
               )}
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Conversion read</p>
-            <div className="mt-4 space-y-2 text-sm leading-7 text-slate-300">
-              <p>Visit to sub conversion: {formatPercent(metrics.visitToSubConversion)}</p>
-              <p>Visit to paid conversion: {formatPercent(metrics.visitToPaidConversion)}</p>
-              {canViewRevenue ? <p>Subscription revenue: {formatCurrency(metrics.earningsSubscribes)}</p> : null}
-              {canViewRevenue ? <p>Messages + tips: {formatCurrency(metrics.earningsSupport)}</p> : null}
+          {/* Countries — inline */}
+          {countries.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Top countries</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {countries.slice(0, 5).map((c) => (
+                  <span key={c.countryCode} className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[11px] text-slate-300">
+                    {c.countryCode} {formatCompactNumber(c.visits)}
+                  </span>
+                ))}
+              </div>
             </div>
+          )}
+
+          {/* Conversion summary — single line */}
+          <div className="flex flex-wrap gap-4 text-[11px] text-slate-500">
+            <span>Visit→Sub {formatPercent(metrics.visitToSubConversion)}</span>
+            <span>Visit→Paid {formatPercent(metrics.visitToPaidConversion)}</span>
+            {canViewRevenue && <span>Sub rev {formatCurrency(metrics.earningsSubscribes)}</span>}
+            {canViewRevenue && <span>Msg+Tips {formatCurrency(metrics.earningsSupport)}</span>}
           </div>
         </div>
       </div>
