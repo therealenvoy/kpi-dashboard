@@ -276,21 +276,28 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <KpiCard label="Followers" value={formatCompactNumber(account?.followers)} helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"} accent="#8fbfff" />
-                <KpiCard label="Avg engagement" value={formatPercent(summary?.averageEngagementRate)} helper={summary?.medianEngagementRate ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel` : "Mean engagement rate"} accent="#c8d2e5" />
-                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/60">Paid subs</p>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="font-display text-[1.6rem] leading-[1] text-white">{formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}</span>
-                    <PaidSubsSparkline />
-                  </div>
+                  <p className="font-display text-[3.5rem] leading-[0.9] text-white">{formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}</p>
+                  {paidSubsSummary?.previous?.paidSubs != null && (() => {
+                    const diff = (paidSubsSummary.latest?.paidSubs || 0) - paidSubsSummary.previous.paidSubs;
+                    const sign = diff > 0 ? "+" : "";
+                    const tone = diff > 0 ? "text-emerald-300" : diff < 0 ? "text-rose-300" : "text-slate-500";
+                    return <p className={`text-[12px] font-medium ${tone}`}>{sign}{formatCompactNumber(diff)} vs previous day</p>;
+                  })()}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/60">Bio link taps</p>
+                  <p className="font-display text-[3.5rem] leading-[0.9] text-white">{formatCompactNumber(summary?.totalLinkTaps)}</p>
+                  <p className="text-[12px] text-slate-500">{formatCompactNumber(pagination.total || summary?.count)} reels · {timeframe === "30d" ? "30 days" : "all time"}</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
-                <span>{pagination.total || 0} reels · {timeframe === "30d" ? "Last 30 days" : "Full archive"}</span>
-                <span>{formatCompactNumber(summary?.averageViews)} avg views/reel</span>
+                <span>{formatCompactNumber(account?.followers)} followers</span>
+                <span>{formatPercent(summary?.averageEngagementRate)} avg ER</span>
+                <span>{formatCompactNumber(summary?.averageViews)} avg views</span>
                 <span>{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</span>
               </div>
             </div>

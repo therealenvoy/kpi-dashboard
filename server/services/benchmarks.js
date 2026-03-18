@@ -214,6 +214,7 @@ function summarizeReels(reels) {
   const totalLikes = reels.reduce((sum, reel) => sum + reel.likes, 0);
   const totalSaves = reels.reduce((sum, reel) => sum + reel.saves, 0);
   const totalShares = reels.reduce((sum, reel) => sum + reel.shares, 0);
+  const totalLinkTaps = reels.reduce((sum, reel) => sum + (reel.linkTaps || 0), 0);
   const averageEngagementRate = count ? reels.reduce((sum, reel) => sum + reel.engagementRate, 0) / count : 0;
   const averageViews = count ? totalViews / count : 0;
   const bestReelViews = reels.reduce((max, reel) => Math.max(max, reel.views), 0);
@@ -231,7 +232,7 @@ function summarizeReels(reels) {
   });
 
   return {
-    count, totalViews, totalLikes, totalSaves, totalShares,
+    count, totalViews, totalLikes, totalSaves, totalShares, totalLinkTaps,
     averageViews, averageEngagementRate,
     medianViews: benchmarks.medianViews,
     medianEngagementRate: benchmarks.medianEngagementRate,
