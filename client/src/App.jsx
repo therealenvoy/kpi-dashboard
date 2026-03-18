@@ -12,6 +12,7 @@ import LifecycleView from "./components/LifecycleView";
 import MobileReelsBriefing from "./components/MobileReelsBriefing";
 import MobileDecisionFeed from "./components/MobileDecisionFeed";
 import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
+import CorrelationPanel from "./components/CorrelationPanel";
 import PaidSubsSparkline from "./components/PaidSubsSparkline";
 import ReelModal from "./components/ReelModal";
 import ReelsTable from "./components/ReelsTable";
@@ -408,6 +409,9 @@ export default function App() {
               </section>
 
               <section className="space-y-6">
+                <CollapsibleAnalysisSection title="Reel → subscriber correlation" description="Which reels were posted before subscription spikes? Statistical patterns over 60 days.">
+                  <CorrelationPanel />
+                </CollapsibleAnalysisSection>
                 <CollapsibleAnalysisSection title="Lifecycle view" description="Inspect where momentum is building or dying across the reel aging curve.">
                   <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
                 </CollapsibleAnalysisSection>

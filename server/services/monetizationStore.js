@@ -305,6 +305,38 @@ async function listDailyMetrics(limit, offset) {
     }));
 }
 
+async function getDailyMetricsByDateRange(startDate, endDate) {
+  if (getStorageMode() === "postgres") {
+    const result = await query(
+      `SELECT
+        date::text AS date,
+        profile_visits_total AS "profileVisitsTotal",
+        new_subs AS "newSubs",
+        renewed_subs AS "renewedSubs",
+        paid_subs AS "paidSubs",
+        free_subs AS "freeSubs"
+       FROM of_daily_metrics
+       WHERE date >= $1 AND date <= $2
+       ORDER BY date ASC`,
+      [startDate, endDate]
+    );
+    return result.rows;
+  }
+
+  const store = readFileStore();
+  return [...store.dailyMetrics]
+    .filter((entry) => entry.date >= startDate && entry.date <= endDate)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((entry) => ({
+      date: entry.date,
+      profileVisitsTotal: entry.profileVisitsTotal,
+      newSubs: entry.newSubs,
+      renewedSubs: entry.renewedSubs,
+      paidSubs: entry.paidSubs,
+      freeSubs: entry.freeSubs
+    }));
+}
+
 async function getDailyMetricsCount() {
   if (getStorageMode() === "postgres") {
     const countResult = await query("SELECT COUNT(*)::int AS total FROM of_daily_metrics");
@@ -484,6 +516,7 @@ module.exports = {
   finishSyncRun,
   getCountryVisitsByDate,
   getDailyMetricByDate,
+  getDailyMetricsByDateRange,
   getDailyMetricsCount,
   getDailyMetricsSummary,
   getStatusSnapshot,

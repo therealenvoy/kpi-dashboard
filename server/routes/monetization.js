@@ -4,12 +4,14 @@ const {
   ensureStoreReady,
   getCountryVisitsByDate,
   getDailyMetricByDate,
+  getDailyMetricsByDateRange,
   getDailyMetricsCount,
   getDailyMetricsSummary,
   getStatusSnapshot,
   getStorageMode,
   listDailyMetrics
 } = require("../services/monetizationStore");
+const { computeCorrelation } = require("../services/correlationEngine");
 const { getJob, listRunningJobs, serializeJob, startMonetizationSyncJob } = require("../services/monetizationJobs");
 const { getAutoSyncSnapshot } = require("../services/monetizationScheduler");
 
@@ -665,6 +667,26 @@ function createMonetizationRouter({ getReelsData, getContextualReels, canViewRev
         }))
         .reverse(); // oldest first for sparkline
       res.json({ trend });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Reel-to-subscription correlation analysis (no auth required, no earnings exposed)
+  router.get("/correlation", async (req, res, next) => {
+    try {
+      await ensureStoreReady();
+      const days = Math.min(Math.max(Number(req.query.days) || 60, 14), 90);
+      const endDate = new Date().toISOString().slice(0, 10);
+      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      const [dailyMetrics, reels] = await Promise.all([
+        getDailyMetricsByDateRange(startDate, endDate),
+        getContextualReels()
+      ]);
+
+      const result = computeCorrelation({ dailyMetrics, reels });
+      res.json(result);
     } catch (error) {
       next(error);
     }
