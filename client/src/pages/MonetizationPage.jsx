@@ -10,21 +10,60 @@ import {
 } from "../lib/api";
 import MonetizationDayDrawer from "../components/MonetizationDayDrawer";
 
-function DailyBar({ value, max, color }) {
+/* ── Sparkline ── */
+function MiniSparkline({ data, color, height = 48 }) {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const w = 160;
+  const pad = 2;
+  const points = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+    return `${x},${y}`;
+  });
+  const line = points.join(" ");
+  const area = `${pad},${height} ${line} ${w - pad},${height}`;
+  return (
+    <svg width={w} height={height} className="absolute bottom-0 right-0 opacity-20" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`spark-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#spark-${color.replace("#", "")})`} />
+      <polyline points={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ── Gradient bar ── */
+function DailyBar({ value, max, gradient, glow }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
-    <div className="h-2 w-full rounded-full bg-white/[0.04]">
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+    <div className="h-[6px] w-full rounded-full bg-white/[0.04]">
+      <div className="h-full rounded-full transition-all duration-500" style={{
+        width: `${pct}%`,
+        background: gradient,
+        boxShadow: pct > 20 ? `0 0 8px ${glow}` : "none"
+      }} />
     </div>
   );
 }
 
+/* ── Delta badge ── */
 function getDelta(today, yesterday) {
   if (today == null || yesterday == null) return null;
   const diff = today - yesterday;
-  if (diff === 0) return { text: "same as yesterday", tone: "text-slate-500" };
+  if (diff === 0) return { text: "0", tone: "text-slate-400 bg-white/[0.04]", arrow: "→" };
   const sign = diff > 0 ? "+" : "";
-  return { text: `${sign}${formatCompactNumber(diff)} vs yesterday`, tone: diff > 0 ? "text-emerald-300" : "text-rose-300" };
+  return {
+    text: `${sign}${formatCompactNumber(diff)}`,
+    tone: diff > 0 ? "text-emerald-300 bg-emerald-500/10" : "text-rose-300 bg-rose-500/10",
+    arrow: diff > 0 ? "↑" : "↓"
+  };
 }
 
 export default function MonetizationPage() {
@@ -111,15 +150,23 @@ export default function MonetizationPage() {
   const subsDelta = getDelta(todaySubs, yesterdaySubs);
   const tapsDelta = getDelta(todayTaps, yesterdayTaps);
 
+  // Sparkline data (last 7 days, reversed so oldest → newest)
+  const subsSparkData = daily.slice(0, 7).map((r) => r.paidSubs || 0).reverse();
+  const tapsSparkData = daily.slice(0, 7).map((r) => linkTapsByDate[r.date] || 0).reverse();
+
   // Max values for bar scaling
   const maxSubs = Math.max(...daily.map((r) => r.paidSubs || 0), 1);
   const maxTaps = Math.max(...daily.map((r) => linkTapsByDate[r.date] || 0), 1);
 
+  // Peak day indices
+  const peakSubsDate = daily.reduce((best, r) => (r.paidSubs || 0) > (best?.paidSubs || 0) ? r : best, daily[0])?.date;
+  const peakTapsDate = daily.reduce((best, r) => (linkTapsByDate[r.date] || 0) > (linkTapsByDate[best?.date] || 0) ? r : best, daily[0])?.date;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {(syncing || refreshing) && <div className="progress-slim fixed inset-x-0 top-0 z-40 h-[2px] bg-white/[0.04]" aria-hidden="true" />}
 
-      {/* Hero: 2 KPI cards */}
+      {/* Hero: 2 KPI cards with sparklines */}
       <section className="hero-shell relative overflow-hidden px-6 py-6 md:px-8 md:py-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_12%,rgba(215,184,120,0.06),transparent_18%)]" />
         <div className="relative space-y-5">
@@ -133,19 +180,35 @@ export default function MonetizationPage() {
             </button>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Paid subs KPI */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/60">Paid subs today</p>
-              <p className="font-display text-[3.5rem] leading-[0.9] text-white">{todaySubs != null ? formatCompactNumber(todaySubs) : "—"}</p>
-              {subsDelta && <p className={`text-[12px] font-medium ${subsDelta.tone}`}>{subsDelta.text}</p>}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Paid subs card */}
+            <div className="relative overflow-hidden rounded-[1.4rem] border border-amber-400/10 bg-gradient-to-br from-amber-500/[0.06] to-transparent px-6 py-5">
+              <MiniSparkline data={subsSparkData} color="#fbbf24" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/70">Paid subs today</p>
+              <div className="mt-2 flex items-end gap-3">
+                <p className="font-display text-[3.8rem] leading-[0.85] text-white">{todaySubs != null ? formatCompactNumber(todaySubs) : "—"}</p>
+                {subsDelta && (
+                  <span className={`mb-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${subsDelta.tone}`}>
+                    {subsDelta.arrow} {subsDelta.text}
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-500">7-day trend</p>
             </div>
 
-            {/* Link taps KPI */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/60">Bio link taps today</p>
-              <p className="font-display text-[3.5rem] leading-[0.9] text-white">{todayTaps != null ? formatCompactNumber(todayTaps) : "—"}</p>
-              {tapsDelta && <p className={`text-[12px] font-medium ${tapsDelta.tone}`}>{tapsDelta.text}</p>}
+            {/* Link taps card */}
+            <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-400/10 bg-gradient-to-br from-sky-500/[0.06] to-transparent px-6 py-5">
+              <MiniSparkline data={tapsSparkData} color="#38bdf8" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/70">Bio link taps today</p>
+              <div className="mt-2 flex items-end gap-3">
+                <p className="font-display text-[3.8rem] leading-[0.85] text-white">{todayTaps != null ? formatCompactNumber(todayTaps) : "—"}</p>
+                {tapsDelta && (
+                  <span className={`mb-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tapsDelta.tone}`}>
+                    {tapsDelta.arrow} {tapsDelta.text}
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-500">7-day trend</p>
             </div>
           </div>
 
@@ -166,25 +229,37 @@ export default function MonetizationPage() {
         </section>
       ) : (
         /* Daily feed */
-        <section className="space-y-1.5">
+        <section className="space-y-1">
           {daily.map((row) => {
             const taps = linkTapsByDate[row.date] || 0;
+            const isPeakSubs = row.date === peakSubsDate && (row.paidSubs || 0) > 0;
+            const isPeakTaps = row.date === peakTapsDate && taps > 0;
+            const isPeak = isPeakSubs || isPeakTaps;
             return (
               <button key={row.date} type="button" onClick={() => setSelectedDate(row.date)}
-                className="flex w-full items-center gap-4 rounded-[1rem] border border-white/6 bg-white/[0.02] px-4 py-3 text-left transition-colors hover:border-white/12 hover:bg-white/[0.04]">
-                {/* Date */}
-                <span className="w-20 shrink-0 text-[13px] font-semibold text-white">{formatDate(row.date)}</span>
+                className={`flex w-full items-center gap-4 rounded-[1rem] border px-4 py-3 text-left transition-all hover:bg-white/[0.04] ${
+                  isPeak ? "border-white/12 bg-white/[0.03]" : "border-white/6 bg-white/[0.015]"
+                }`}>
+                {/* Date + peak badge */}
+                <div className="w-20 shrink-0">
+                  <span className="text-[13px] font-semibold text-white">{formatDate(row.date)}</span>
+                  {isPeak && <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400/60">peak</p>}
+                </div>
 
                 {/* Bars */}
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-10 text-right text-[11px] font-semibold text-amber-300">{formatCompactNumber(row.paidSubs)}</span>
-                    <div className="flex-1"><DailyBar value={row.paidSubs || 0} max={maxSubs} color="#fbbf24" /></div>
+                    <div className="flex-1">
+                      <DailyBar value={row.paidSubs || 0} max={maxSubs} gradient="linear-gradient(90deg, #f59e0b, #fbbf24)" glow="rgba(251,191,36,0.3)" />
+                    </div>
                     <span className="w-8 text-[9px] uppercase text-slate-500">subs</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-10 text-right text-[11px] font-semibold text-sky-300">{formatCompactNumber(taps)}</span>
-                    <div className="flex-1"><DailyBar value={taps} max={maxTaps} color="#38bdf8" /></div>
+                    <div className="flex-1">
+                      <DailyBar value={taps} max={maxTaps} gradient="linear-gradient(90deg, #0284c7, #38bdf8)" glow="rgba(56,189,248,0.3)" />
+                    </div>
                     <span className="w-8 text-[9px] uppercase text-slate-500">taps</span>
                   </div>
                 </div>
