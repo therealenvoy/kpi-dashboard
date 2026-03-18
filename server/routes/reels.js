@@ -80,7 +80,7 @@ async function getFilteredReels(query) {
     contextualReels = contextualReels.filter((reel) => reel.ageDays <= 7 && reel.performanceStatus === "underperforming");
   }
 
-  return { reels: contextualReels, benchmarks };
+  return { reels: contextualReels };
 }
 
 function buildSnapshotSeries(snapshots, reelMap, reelId) {
