@@ -82,8 +82,8 @@ function ReelCard({ reel, expanded, onToggle }) {
             ) : (
               <span className="text-slate-500">No link taps</span>
             )}
-            {(reel.topCountriesWithPct?.length > 0 || reel.topCountryCodes?.length > 0) && (
-              <CountryDonut entries={reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes} />
+            {reel.topCountryCodes?.length > 0 && (
+              <span className="text-slate-500">{reel.topCountryCodes.slice(0, 2).join(", ")}</span>
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
@@ -111,7 +111,35 @@ function ReelCard({ reel, expanded, onToggle }) {
 
       {/* Expanded detail */}
       {expanded && (
-        <div className="border-t border-white/6 px-4 py-3">
+        <div className="border-t border-white/6 px-4 py-3 space-y-3">
+          {/* Country audience + donut */}
+          {(reel.topCountriesWithPct?.length > 0 || reel.topCountryCodes?.length > 0) && (
+            <div className="flex items-start gap-4">
+              <CountryDonut entries={reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes} size={52} />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                {(reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes.map((c) => ({ code: c, pct: null }))).slice(0, 5).map((entry, i) => {
+                  const code = typeof entry === "string" ? entry : entry.code;
+                  const pct = typeof entry === "string" ? null : entry.pct;
+                  return (
+                    <div key={code} className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: COUNTRY_COLORS[i] }} />
+                      <span className="w-16 shrink-0 text-[11px] font-medium text-slate-200">{code}</span>
+                      {pct != null && (
+                        <>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: COUNTRY_COLORS[i], opacity: 0.7 }} />
+                          </div>
+                          <span className="w-8 shrink-0 text-right text-[10px] text-slate-500">{pct}%</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Metrics grid */}
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             <MetricPill label="Views" value={formatCompactNumber(reel.views)} />
             <MetricPill label="Reach" value={formatCompactNumber(reel.reach)} />
@@ -124,7 +152,8 @@ function ReelCard({ reel, expanded, onToggle }) {
             <MetricPill label="Surface" value={reel.inFeed ? "In feed" : "Reels only"} />
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
             {reel.permalink && (
               <a href={reel.permalink} target="_blank" rel="noreferrer"
                 className="rounded-full border border-white/8 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:border-white/16 hover:text-white">
@@ -139,7 +168,7 @@ function ReelCard({ reel, expanded, onToggle }) {
           </div>
 
           {reel.workflowReasons?.length > 0 && (
-            <p className="mt-3 text-[11px] leading-5 text-slate-500">{reel.workflowReasons.join(" ")}</p>
+            <p className="text-[11px] leading-5 text-slate-500">{reel.workflowReasons.join(" ")}</p>
           )}
         </div>
       )}
