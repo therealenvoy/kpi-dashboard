@@ -3,17 +3,27 @@ import { formatCompactNumber, formatPercent, formatRelative, formatSignedCompact
 import ReelThumbnail from "./ReelThumbnail";
 
 const COUNTRY_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#a855f7", "#ef4444"];
+const OTHERS_COLOR = "rgba(255,255,255,0.1)";
 const RANK_FALLBACK = [40, 25, 18, 10, 7];
+
+function buildCountryItems(entries) {
+  const items = entries.slice(0, 5).map((e, i) => {
+    if (typeof e === "string") return { code: e, pct: RANK_FALLBACK[i] || 5, color: COUNTRY_COLORS[i] };
+    return { code: e.code, pct: e.pct ?? RANK_FALLBACK[i] ?? 5, color: COUNTRY_COLORS[i] };
+  });
+  const knownTotal = items.reduce((sum, c) => sum + c.pct, 0);
+  const hasRealPct = entries.some((e) => typeof e !== "string" && e.pct != null);
+  if (hasRealPct && knownTotal < 100) {
+    items.push({ code: "Others", pct: 100 - knownTotal, color: OTHERS_COLOR });
+  }
+  return items;
+}
 
 // entries: array of { code, pct } or plain string codes
 function CountryDonut({ entries, size = 28 }) {
   if (!entries?.length) return null;
 
-  const items = entries.slice(0, 5).map((e, i) => {
-    if (typeof e === "string") return { code: e, pct: RANK_FALLBACK[i] || 5 };
-    return { code: e.code, pct: e.pct ?? RANK_FALLBACK[i] ?? 5 };
-  });
-
+  const items = buildCountryItems(entries);
   const total = items.reduce((sum, c) => sum + c.pct, 0) || 1;
   const r = size / 2;
   const strokeWidth = 4;
@@ -21,7 +31,7 @@ function CountryDonut({ entries, size = 28 }) {
   const circumference = 2 * Math.PI * radius;
 
   let offset = 0;
-  const arcs = items.map((c, i) => {
+  const arcs = items.map((c) => {
     const fraction = c.pct / total;
     const dash = fraction * circumference;
     const gap = circumference - dash;
@@ -30,29 +40,16 @@ function CountryDonut({ entries, size = 28 }) {
 
     return (
       <circle key={c.code} cx={r} cy={r} r={radius} fill="none"
-        stroke={COUNTRY_COLORS[i]} strokeWidth={strokeWidth}
+        stroke={c.color} strokeWidth={strokeWidth}
         strokeDasharray={`${dash} ${gap}`} transform={`rotate(${rotation} ${r} ${r})`} />
     );
   });
 
   return (
-    <div className="group relative inline-flex shrink-0 items-center">
-      <svg width={size} height={size} className="shrink-0">
-        <circle cx={r} cy={r} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
-        {arcs}
-      </svg>
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 rounded-lg border border-white/10 bg-slate-900 px-3 py-2 shadow-xl group-hover:block">
-        <div className="flex flex-col gap-1">
-          {items.map((c, i) => (
-            <div key={c.code} className="flex items-center gap-2 whitespace-nowrap text-[10px]">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: COUNTRY_COLORS[i] }} />
-              <span className="text-slate-200">{c.code}</span>
-              {c.pct != null && <span className="text-slate-500">{c.pct}%</span>}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <svg width={size} height={size} className="shrink-0">
+      <circle cx={r} cy={r} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+      {arcs}
+    </svg>
   );
 }
 
@@ -113,31 +110,27 @@ function ReelCard({ reel, expanded, onToggle }) {
       {expanded && (
         <div className="border-t border-white/6 px-4 py-3 space-y-3">
           {/* Country audience + donut */}
-          {(reel.topCountriesWithPct?.length > 0 || reel.topCountryCodes?.length > 0) && (
-            <div className="flex items-start gap-4">
-              <CountryDonut entries={reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes} size={52} />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                {(reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes.map((c) => ({ code: c, pct: null }))).slice(0, 5).map((entry, i) => {
-                  const code = typeof entry === "string" ? entry : entry.code;
-                  const pct = typeof entry === "string" ? null : entry.pct;
-                  return (
-                    <div key={code} className="flex items-center gap-2">
-                      <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: COUNTRY_COLORS[i] }} />
-                      <span className="w-16 shrink-0 text-[11px] font-medium text-slate-200">{code}</span>
-                      {pct != null && (
-                        <>
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: COUNTRY_COLORS[i], opacity: 0.7 }} />
-                          </div>
-                          <span className="w-8 shrink-0 text-right text-[10px] text-slate-500">{pct}%</span>
-                        </>
-                      )}
+          {(reel.topCountriesWithPct?.length > 0 || reel.topCountryCodes?.length > 0) && (() => {
+            const raw = reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes;
+            const items = buildCountryItems(raw);
+            return (
+              <div className="flex items-start gap-4">
+                <CountryDonut entries={raw} size={52} />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  {items.map((c) => (
+                    <div key={c.code} className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+                      <span className="w-16 shrink-0 text-[11px] font-medium text-slate-200">{c.code}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div className="h-full rounded-full" style={{ width: `${c.pct}%`, backgroundColor: c.color, opacity: 0.7 }} />
+                      </div>
+                      <span className="w-8 shrink-0 text-right text-[10px] text-slate-500">{c.pct}%</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Metrics grid */}
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
