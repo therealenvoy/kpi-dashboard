@@ -17,11 +17,28 @@ const SORTABLE_COLUMNS = [
   { key: "workflow", label: "Score" },
   { key: "postedAt", label: "Posted" },
   { key: "views", label: "Views" },
-  { key: "likes", label: "Likes" },
   { key: "engagement", label: "ER" },
   { key: "saves", label: "Saves" },
   { key: "shares", label: "Shares" }
 ];
+
+function getScoreColor(score) {
+  if (score >= 75) return "#4ade80";
+  if (score <= 25) return "#f87171";
+  return "#fbbf24";
+}
+
+function ScoreBar({ score }) {
+  const color = getScoreColor(score);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 w-10 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-[13px] font-semibold" style={{ color }}>{score}</span>
+    </div>
+  );
+}
 
 function getRowClasses(decision) {
   if (decision === "scale") {
@@ -115,7 +132,7 @@ export default function ReelsTable({
       <SectionHeader
         eyebrow="Library"
         title="Reels performance"
-        description="The operating table: newest first by default, optimized for scanning the reels that need attention now."
+        description="Click any reel for full detail. Green = top 25%, red = bottom 25%."
       />
 
       <div className="table-scroll mt-6 overflow-x-auto">
@@ -131,13 +148,7 @@ export default function ReelsTable({
                 </th>
               ))}
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Comments
-              </th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 24h
-              </th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Reach
               </th>
               <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 Actions
@@ -175,32 +186,18 @@ export default function ReelsTable({
                   </div>
                 </td>
                 <td className="px-3 py-4">
-                  <div className="space-y-2">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getWorkflowTone(reel.workflowDecision)}`}>
-                      {formatDecisionLabel(reel.workflowDecision)}
-                    </span>
-                    <p className="text-[10px] uppercase tracking-[0.08em] text-slate-500">
-                      {reel.workflowDecision === "scale"
-                        ? "Ready now"
-                        : reel.workflowDecision === "drop"
-                          ? "Low priority"
-                          : "Check again"}
-                    </p>
-                  </div>
+                  <ScoreBar score={reel.performanceScore || 0} />
                 </td>
                 <td className="px-3 py-4 text-[13px] text-slate-300">{formatDate(reel.postedAt)}</td>
                 <td className="px-3 py-4 font-semibold text-white">{formatCompactNumber(reel.views)}</td>
-                <td className="px-3 py-4 text-[13px] text-slate-300">{formatCompactNumber(reel.likes)}</td>
                 <td className="px-3 py-4">
-                  <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getEngagementTone(reel.engagementRate)}`}>
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-semibold ${getEngagementTone(reel.engagementRate)}`}>
                     {formatPercent(reel.engagementRate)}
                   </span>
                 </td>
                 <td className="px-3 py-4 text-[13px] text-slate-300">{formatCompactNumber(reel.saves)}</td>
                 <td className="px-3 py-4 text-[13px] text-slate-300">{formatCompactNumber(reel.shares)}</td>
-                <td className="px-3 py-4 text-[13px] text-slate-300">{formatCompactNumber(reel.comments)}</td>
                 <td className="px-3 py-4 text-[13px] font-medium text-[#d7b878]">{formatSignedCompactNumber(reel.views24hDelta)}</td>
-                <td className="px-3 py-4 text-[13px] text-slate-300">{formatCompactNumber(reel.reach)}</td>
                 <td className="rounded-r-3xl px-3 py-4">
                   <div className="flex items-center justify-end gap-2">
                     <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">

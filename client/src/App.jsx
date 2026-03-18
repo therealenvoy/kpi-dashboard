@@ -12,6 +12,7 @@ import LifecycleView from "./components/LifecycleView";
 import MobileReelsBriefing from "./components/MobileReelsBriefing";
 import MobileDecisionFeed from "./components/MobileDecisionFeed";
 import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
+import CorrelationInsightsStrip from "./components/CorrelationInsightsStrip";
 import CorrelationPanel from "./components/CorrelationPanel";
 import PaidSubsSparkline from "./components/PaidSubsSparkline";
 import ReelModal from "./components/ReelModal";
@@ -303,56 +304,44 @@ export default function App() {
         <MonetizationPage />
       ) : (
         <>
-          <section className="hero-shell relative overflow-hidden px-6 py-6 md:px-8 md:py-7">
+          <section className="hero-shell relative overflow-hidden px-6 py-5 md:px-8 md:py-6">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_8%,rgba(215,184,120,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_34%)]" />
-            <div className="relative space-y-5">
+            <div className="relative space-y-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Content intelligence</p>
-                  <p className="text-[13px] leading-6 text-slate-300">
-                    A sharp read on what to repeat next for {account?.username ? `@${account.username}` : "@itslittlealyson__"}.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-3 md:items-end">
+                <p className="text-[13px] font-medium text-slate-200">
+                  {account?.username ? `@${account.username}` : "Reels dashboard"}
+                </p>
+                <div className="flex items-center gap-4">
                   <div className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 text-sm">
                     {["30d", "all"].map((value) => (
                       <button key={value} type="button" onClick={() => handleTimeframeChange(value)}
-                        className={`rounded-full px-4 py-2 font-semibold transition-colors ${timeframe === value ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"}`}>
-                        {value === "30d" ? "Last 30 days" : "All time"}
+                        className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${timeframe === value ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"}`}>
+                        {value === "30d" ? "30d" : "All"}
                       </button>
                     ))}
                   </div>
-                  <button type="button" onClick={() => setRefreshNonce((c) => c + 1)} className="text-[12px] text-slate-400 transition-colors hover:text-white">
-                    Refresh this view
+                  <button type="button" onClick={() => setRefreshNonce((c) => c + 1)} className="text-[11px] text-slate-500 transition-colors hover:text-white">
+                    {getRefreshCountdown(refreshMeta?.expiresAt)}
                   </button>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+              <div className="grid gap-4 md:grid-cols-3">
                 <KpiCard label="Followers" value={formatCompactNumber(account?.followers)} helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"} accent="#8fbfff" />
-                <KpiCard label="Reels in view" value={formatCompactNumber(summary?.count ?? account?.mediaCount)} helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Latest 30-day slice" : "Full historical library"} accent="#9cb0d3" />
-                <KpiCard label="Avg engagement" value={formatPercent(summary?.averageEngagementRate)} helper={summary?.medianEngagementRate ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel` : "Mean engagement rate in this view"} accent="#c8d2e5" />
-                <KpiCard label="Avg views / reel" value={formatCompactNumber(summary?.averageViews)} helper={summary?.benchmarks?.previous7dAverageViews ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort` : "Average current views per reel"} accent="#5875af" />
-                <KpiCard label="Paid subs" value={formatCompactNumber(paidSubsSummary?.latest?.paidSubs)} helper={paidSubsSummary?.previous?.paidSubs != null ? `Previous day: ${formatCompactNumber(paidSubsSummary.previous.paidSubs)}` : "Paid subscriber count"} accent="#d4a853" />
+                <KpiCard label="Avg engagement" value={formatPercent(summary?.averageEngagementRate)} helper={summary?.medianEngagementRate ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel` : "Mean engagement rate"} accent="#c8d2e5" />
+                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/60">Paid subs</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="font-display text-[1.6rem] leading-[1] text-white">{formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}</span>
+                    <PaidSubsSparkline />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Current slice</p>
-                  <p className="mt-2 text-[13px] text-slate-200">{pagination.total || 0} reels in focus</p>
-                </div>
-                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Timeframe</p>
-                  <p className="mt-2 text-[13px] text-slate-200">{timeframe === "30d" ? "Last 30 days" : "Full archive"}</p>
-                </div>
-                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Refresh</p>
-                  <p className="mt-2 text-[13px] text-slate-200">{getRefreshCountdown(refreshMeta?.expiresAt)}</p>
-                </div>
-                <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Subs trend (7d)</p>
-                  <div className="mt-2"><PaidSubsSparkline /></div>
-                </div>
+              <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+                <span>{pagination.total || 0} reels · {timeframe === "30d" ? "Last 30 days" : "Full archive"}</span>
+                <span>{formatCompactNumber(summary?.averageViews)} avg views/reel</span>
+                <span>{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</span>
               </div>
             </div>
           </section>
@@ -378,7 +367,35 @@ export default function App() {
 
               <MobileReelsBriefing summary={summary} topReels={tableData.slice(0, 5)} onSelectReel={handleSelectReel} />
 
-              <section className="space-y-6 border-t border-white/6 pt-8">
+              <CorrelationInsightsStrip />
+
+              {(() => {
+                const scaleCount = tableData.filter((r) => r.workflowDecision === "scale").length;
+                const watchCount = tableData.filter((r) => r.workflowDecision === "watch").length;
+                const dropCount = tableData.filter((r) => r.workflowDecision === "drop").length;
+                return (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: "all", label: `All ${tableData.length}`, count: tableData.length },
+                      { key: "scale", label: `Scale ${scaleCount}`, count: scaleCount },
+                      { key: "watch", label: `Watch ${watchCount}`, count: watchCount },
+                      { key: "drop", label: `Drop ${dropCount}`, count: dropCount }
+                    ].map((item) => (
+                      <button key={item.key} type="button"
+                        onClick={() => updateFilter("workflowDecision", item.key === "all" ? "all" : item.key)}
+                        className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                          (filters.workflowDecision === item.key || (item.key === "all" && filters.workflowDecision === "all"))
+                            ? "bg-white/10 text-white"
+                            : "text-slate-500 hover:text-slate-200"
+                        }`}>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <section className="space-y-6">
                 <DashboardFilters
                   query={filters.q} preset={filters.preset} boosted={filters.boosted}
                   surface={filters.surface} topCountry={filters.topCountry}
