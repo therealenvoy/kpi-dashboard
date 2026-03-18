@@ -89,9 +89,15 @@ async function getReelsData() {
       paidViews: parseNumber(row[15]),
       paidReach: parseNumber(row[16]),
       engagementRate: parsePercent(row[17]),
-      topCountries: [row[18], row[19], row[20], row[21], row[22]].filter(Boolean),
-      lastUpdated: parseDate(row[23]),
-      linkTaps: parseNumber(row[28])
+      topCountries: [
+        row[18] ? `${row[18]}:${row[19] || ""}` : "",
+        row[20] ? `${row[20]}:${row[21] || ""}` : "",
+        row[22] ? `${row[22]}:${row[23] || ""}` : "",
+        row[24] ? `${row[24]}:${row[25] || ""}` : "",
+        row[26] ? `${row[26]}:${row[27] || ""}` : ""
+      ].filter((v) => v && !v.startsWith(":")),
+      linkTaps: parseNumber(row[28]),
+      lastUpdated: parseDate(row[29])
     }))
     .map(enrichReel)
     .sort((a, b) => new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime());
