@@ -8,7 +8,7 @@
 // Workflow decision = top 25% → scale, bottom 25% → drop, middle → watch.
 
 const { WEEKDAY_KEYS, AGE_BUCKETS, WORKFLOW } = require("../config");
-const { roundMetric, computeRate, normalizeCountryCode } = require("./parsers");
+const { roundMetric, computeRate, normalizeCountryCode, parseCountryEntry } = require("./parsers");
 
 function getWeekdayKey(value) {
   if (!value) return "";
@@ -75,7 +75,9 @@ function enrichReel(rawReel) {
   const weekday = getWeekdayKey(rawReel.postedAt);
   const captionLength = (rawReel.caption || "").trim().length;
   const captionBand = captionLength < 40 ? "short" : captionLength < 90 ? "medium" : "long";
-  const topCountryCodes = (rawReel.topCountries || []).map(normalizeCountryCode).filter(Boolean);
+  const parsedCountries = (rawReel.topCountries || []).map(parseCountryEntry).filter(Boolean);
+  const topCountryCodes = parsedCountries.map((c) => c.code);
+  const topCountriesWithPct = parsedCountries;
   const viewsPerDay = rawReel.views / Math.max(ageDays, 1);
   const slowdownScore = roundMetric(rawReel.views24hDelta - rawReel.views7dDelta / 7, 1);
 
@@ -88,6 +90,7 @@ function enrichReel(rawReel) {
     captionLength,
     captionBand,
     topCountryCodes,
+    topCountriesWithPct,
     saveRate: roundMetric(saveRate),
     shareRate: roundMetric(shareRate),
     likeRate: roundMetric(likeRate),

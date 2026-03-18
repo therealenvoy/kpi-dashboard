@@ -71,6 +71,16 @@ function normalizeCountryCode(value) {
     .toUpperCase();
 }
 
+function parseCountryEntry(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const parts = raw.split(":");
+  const code = parts[0].trim().toUpperCase();
+  if (!code) return null;
+  const pct = parts.length > 1 ? parseNumber(parts[1]) : null;
+  return { code, pct };
+}
+
 function toSlug(value) {
   return String(value || "")
     .toLowerCase()
@@ -88,5 +98,6 @@ module.exports = {
   computeRate,
   getMedian,
   normalizeCountryCode,
+  parseCountryEntry,
   toSlug
 };

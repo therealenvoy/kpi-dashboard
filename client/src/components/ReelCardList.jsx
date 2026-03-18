@@ -2,6 +2,60 @@ import { useState } from "react";
 import { formatCompactNumber, formatPercent, formatRelative, formatSignedCompactNumber, truncate } from "../lib/formatters";
 import ReelThumbnail from "./ReelThumbnail";
 
+const COUNTRY_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#a855f7", "#ef4444"];
+const RANK_FALLBACK = [40, 25, 18, 10, 7];
+
+// entries: array of { code, pct } or plain string codes
+function CountryDonut({ entries, size = 28 }) {
+  if (!entries?.length) return null;
+
+  const items = entries.slice(0, 5).map((e, i) => {
+    if (typeof e === "string") return { code: e, pct: RANK_FALLBACK[i] || 5 };
+    return { code: e.code, pct: e.pct ?? RANK_FALLBACK[i] ?? 5 };
+  });
+
+  const total = items.reduce((sum, c) => sum + c.pct, 0) || 1;
+  const r = size / 2;
+  const strokeWidth = 4;
+  const radius = r - strokeWidth / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  let offset = 0;
+  const arcs = items.map((c, i) => {
+    const fraction = c.pct / total;
+    const dash = fraction * circumference;
+    const gap = circumference - dash;
+    const rotation = (offset / total) * 360 - 90;
+    offset += c.pct;
+
+    return (
+      <circle key={c.code} cx={r} cy={r} r={radius} fill="none"
+        stroke={COUNTRY_COLORS[i]} strokeWidth={strokeWidth}
+        strokeDasharray={`${dash} ${gap}`} transform={`rotate(${rotation} ${r} ${r})`} />
+    );
+  });
+
+  return (
+    <div className="group relative inline-flex shrink-0 items-center">
+      <svg width={size} height={size} className="shrink-0">
+        <circle cx={r} cy={r} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+        {arcs}
+      </svg>
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 rounded-lg border border-white/10 bg-slate-900 px-3 py-2 shadow-xl group-hover:block">
+        <div className="flex flex-col gap-1">
+          {items.map((c, i) => (
+            <div key={c.code} className="flex items-center gap-2 whitespace-nowrap text-[10px]">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: COUNTRY_COLORS[i] }} />
+              <span className="text-slate-200">{c.code}</span>
+              {c.pct != null && <span className="text-slate-500">{c.pct}%</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getDecisionStyle(decision) {
   switch (decision) {
     case "scale": return "text-emerald-300 bg-emerald-500/12 border-emerald-400/20";
@@ -28,8 +82,8 @@ function ReelCard({ reel, expanded, onToggle }) {
             ) : (
               <span className="text-slate-500">No link taps</span>
             )}
-            {reel.topCountryCodes?.length > 0 && (
-              <span className="text-slate-500">{reel.topCountryCodes.slice(0, 3).join(", ")}</span>
+            {(reel.topCountriesWithPct?.length > 0 || reel.topCountryCodes?.length > 0) && (
+              <CountryDonut entries={reel.topCountriesWithPct?.length ? reel.topCountriesWithPct : reel.topCountryCodes} />
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
