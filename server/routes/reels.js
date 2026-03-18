@@ -1,9 +1,9 @@
 // Reels API routes — account, reels list, snapshots, report, CSV export.
 
 const { getReelsData, getAccountOverview, getSnapshotsData, getRefreshMetadata } = require("../services/sheetsClient");
-const { annotateContextualReels, getEngagementBand } = require("../services/reelEnricher");
+const { scoreReelsInContext, getEngagementBand } = require("../services/reelEnricher");
 const { normalizeCountryCode, getMedian, roundMetric, toSlug } = require("../services/parsers");
-const { sortReels, buildBenchmarks, summarizeReels, generateDailyReport, buildCsv } = require("../services/benchmarks");
+const { sortReels, summarizeReels, generateDailyReport, buildCsv } = require("../services/benchmarks");
 
 function applyTimeframe(reels, timeframe) {
   if (timeframe === "all") return reels;
@@ -69,15 +69,15 @@ async function getFilteredReels(query) {
   const reels = await getReelsData();
   const baseReels = applyTimeframe(reels, timeframe);
   const prefiltered = applyQueryFilters(baseReels, { ...query, preset: "", workflowDecision: "all" });
-  const benchmarks = buildBenchmarks(prefiltered);
-  let contextualReels = annotateContextualReels(prefiltered, benchmarks);
+  // Score all reels against age peers using percentile ranking
+  let contextualReels = scoreReelsInContext(prefiltered);
   contextualReels = applyQueryFilters(contextualReels, query);
 
   if (query.preset === "recent-breakouts") {
-    contextualReels = contextualReels.filter((reel) => reel.ageDays <= 7 && reel.breakoutVsAgeMedian >= 1.1);
+    contextualReels = contextualReels.filter((reel) => reel.ageDays <= 7 && reel.performanceScore >= 75);
   }
   if (query.preset === "underperforming-new-posts") {
-    contextualReels = contextualReels.filter((reel) => reel.ageDays <= 7 && reel.anomalyStatus === "underperforming");
+    contextualReels = contextualReels.filter((reel) => reel.ageDays <= 7 && reel.performanceStatus === "underperforming");
   }
 
   return { reels: contextualReels, benchmarks };

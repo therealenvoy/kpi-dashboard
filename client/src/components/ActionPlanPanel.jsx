@@ -19,7 +19,7 @@ function buildEditorActions(summary) {
   const execSummary = summary.executiveSummary || [];
 
   // Priority 1: Breakout reel spiking — repost on stories
-  const breakoutReel = highlights.breakout || highlights.breakoutScore;
+  const breakoutReel = highlights.momentum || highlights.bestPerformer;
   if (breakoutReel && (breakoutReel.views24hDelta || 0) > 5000 && (breakoutReel.ageDays || 0) <= 3) {
     actions.push({
       reel: breakoutReel,

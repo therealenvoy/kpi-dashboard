@@ -14,14 +14,13 @@ function makeReel(overrides = {}) {
     shares: 30,
     saves: 50,
     engagementRate: 3.5,
-    breakoutScore: 120,
+    performanceScore: 60,
     saveRate: 0.5,
     shareRate: 0.3,
     ageBucket: "1-3d",
     ageDays: 2,
     workflowDecision: "watch",
     workflowPriority: 2,
-    workflowScore: 50,
     topCountryCodes: ["US"],
     weekday: "mon",
     captionLength: 50,
@@ -50,6 +49,17 @@ describe("sortReels", () => {
     expect(sorted[0].reelId).toBe("a");
   });
 
+  it("sorts by performance score", () => {
+    const perfReels = [
+      makeReel({ reelId: "low", performanceScore: 20 }),
+      makeReel({ reelId: "high", performanceScore: 90 }),
+      makeReel({ reelId: "mid", performanceScore: 55 })
+    ];
+    const sorted = sortReels(perfReels, "performance", "desc");
+    expect(sorted[0].reelId).toBe("high");
+    expect(sorted[2].reelId).toBe("low");
+  });
+
   it("does not mutate original", () => {
     const sorted = sortReels(reels, "views", "desc");
     expect(sorted).not.toBe(reels);
@@ -59,21 +69,21 @@ describe("sortReels", () => {
 
 describe("pickTopReel / pickBottomReel", () => {
   const reels = [
-    makeReel({ reelId: "low", breakoutScore: 10 }),
-    makeReel({ reelId: "high", breakoutScore: 200 }),
-    makeReel({ reelId: "mid", breakoutScore: 100 })
+    makeReel({ reelId: "low", performanceScore: 10 }),
+    makeReel({ reelId: "high", performanceScore: 90 }),
+    makeReel({ reelId: "mid", performanceScore: 50 })
   ];
 
   it("picks highest", () => {
-    expect(pickTopReel(reels, (r) => r.breakoutScore).reelId).toBe("high");
+    expect(pickTopReel(reels, (r) => r.performanceScore).reelId).toBe("high");
   });
 
   it("picks lowest", () => {
-    expect(pickBottomReel(reels, (r) => r.breakoutScore).reelId).toBe("low");
+    expect(pickBottomReel(reels, (r) => r.performanceScore).reelId).toBe("low");
   });
 
   it("returns null for empty", () => {
-    expect(pickTopReel([], (r) => r.breakoutScore)).toBe(null);
+    expect(pickTopReel([], (r) => r.performanceScore)).toBe(null);
   });
 });
 
@@ -87,13 +97,14 @@ describe("buildBenchmarks", () => {
 
   it("computes benchmarks for reels", () => {
     const reels = [
-      makeReel({ views: 100, engagementRate: 2, breakoutScore: 50 }),
-      makeReel({ views: 200, engagementRate: 4, breakoutScore: 100 }),
-      makeReel({ views: 300, engagementRate: 6, breakoutScore: 150 })
+      makeReel({ views: 100, engagementRate: 2, performanceScore: 30 }),
+      makeReel({ views: 200, engagementRate: 4, performanceScore: 50 }),
+      makeReel({ views: 300, engagementRate: 6, performanceScore: 70 })
     ];
     const b = buildBenchmarks(reels);
     expect(b.medianViews).toBe(200);
     expect(b.averageViews).toBe(200);
+    expect(b.averagePerformanceScore).toBe(50);
     expect(b.ageBuckets).toHaveProperty("1-3d");
   });
 });

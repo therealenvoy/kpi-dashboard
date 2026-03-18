@@ -103,22 +103,22 @@ export function getReelInsightReasons(reel) {
 
   const reasons = [];
 
-  if ((reel.saveRateVsMedian || 0) >= 1.4 && (reel.shareRateVsMedian || 0) >= 1.4) {
-    reasons.push("High saves + share rate");
+  if ((reel.savesPercentile || 0) >= 75 && (reel.sharesPercentile || 0) >= 75) {
+    reasons.push("High saves + shares for age");
   } else {
-    if ((reel.saveRateVsMedian || 0) >= 1.4) {
-      reasons.push("High saves");
+    if ((reel.savesPercentile || 0) >= 75) {
+      reasons.push("High save rate for age");
     }
 
-    if ((reel.shareRateVsMedian || 0) >= 1.4) {
-      reasons.push("High share rate");
+    if ((reel.sharesPercentile || 0) >= 75) {
+      reasons.push("High share rate for age");
     }
   }
 
-  if ((reel.breakoutVsAgeMedian || 0) >= 1.2 || reel.anomalyStatus === "overperforming") {
-    reasons.push("Outperforming age cohort");
-  } else if ((reel.breakoutVsAgeMedian || 0) > 0 && (reel.breakoutVsAgeMedian || 0) <= 0.7) {
-    reasons.push("Below age cohort");
+  if ((reel.performanceScore || 0) >= 75) {
+    reasons.push(`Top ${100 - (reel.performanceScore || 0)}% for its age`);
+  } else if ((reel.performanceScore || 0) <= 25) {
+    reasons.push("Below average for age");
   }
 
   if ((reel.ageDays || 0) <= 3 && (reel.views24hDelta || 0) > 0) {
@@ -127,9 +127,9 @@ export function getReelInsightReasons(reel) {
     reasons.push("Momentum slowing");
   }
 
-  if ((reel.engagementVsAgeMedian || 0) >= 1.15) {
+  if ((reel.engagementPercentile || 0) >= 75) {
     reasons.push("Engagement above peers");
-  } else if ((reel.engagementVsAgeMedian || 0) > 0 && (reel.engagementVsAgeMedian || 0) <= 0.8) {
+  } else if ((reel.engagementPercentile || 0) <= 25) {
     reasons.push("Weak engagement vs peers");
   }
 

@@ -44,24 +44,11 @@ function getDecisionWeight(reel) {
   return 1;
 }
 
-function getAnomalyWeight(reel) {
-  if (reel.anomalyStatus === "overperforming") {
-    return 1.08;
-  }
-  if (reel.anomalyStatus === "underperforming") {
-    return 0.84;
-  }
+function getPerformanceWeight(reel) {
+  const score = reel.performanceScore || 50;
+  if (score >= 75) return 1.08;
+  if (score <= 25) return 0.84;
   return 1;
-}
-
-function getPreferredMetric(reel, preferredKey, fallbackKey) {
-  const preferredValue = Number(reel?.[preferredKey] || 0);
-  if (preferredValue > 0) {
-    return preferredValue;
-  }
-
-  const fallbackValue = Number(reel?.[fallbackKey] || 0);
-  return fallbackValue > 0 ? fallbackValue : 0;
 }
 
 function buildDriverReasonTags(reel, hoursFromDayEnd) {
@@ -73,22 +60,22 @@ function buildDriverReasonTags(reel, hoursFromDayEnd) {
     reasons.push("still in the 48h window");
   }
 
-  if ((reel.breakoutVsAgeMedian || 0) >= 1.2) {
-    reasons.push(`${reel.breakoutVsAgeMedian}x breakout vs age peers`);
+  if ((reel.performanceScore || 0) >= 75) {
+    reasons.push(`top ${100 - (reel.performanceScore || 0)}% performer for its age`);
   }
 
-  if ((reel.shareRateVsMedian || 0) >= 1.1) {
+  if ((reel.sharesPercentile || 0) >= 75) {
     reasons.push("high share intent");
   }
 
-  if ((reel.saveRateVsMedian || 0) >= 1.1) {
+  if ((reel.savesPercentile || 0) >= 75) {
     reasons.push("high save intent");
   }
 
   if (reel.workflowDecision === "scale") {
-    reasons.push("already scores as Scale");
-  } else if (reel.anomalyStatus === "overperforming") {
-    reasons.push("overperforming for its age");
+    reasons.push("classified as Scale");
+  } else if (reel.performanceStatus === "outperforming") {
+    reasons.push("outperforming age peers");
   }
 
   if (reel.views24hDelta > 0 && reasons.length < 4) {
@@ -141,29 +128,23 @@ function buildLikelyDrivers(reels, date, metrics) {
     });
 
   const maxMomentum = Math.max(...candidates.map((reel) => Math.max(reel.views24hDelta || 0, 0)), 1);
-  const maxBreakout = Math.max(...candidates.map((reel) => getPreferredMetric(reel, "breakoutVsAgeMedian", "breakoutScore")), 1);
-  const maxSaveIntent = Math.max(...candidates.map((reel) => getPreferredMetric(reel, "saveRateVsMedian", "saveRate")), 1);
-  const maxShareIntent = Math.max(...candidates.map((reel) => getPreferredMetric(reel, "shareRateVsMedian", "shareRate")), 1);
-  const maxEngagement = Math.max(...candidates.map((reel) => getPreferredMetric(reel, "engagementVsAgeMedian", "engagementRate")), 1);
-  const maxWorkflow = Math.max(...candidates.map((reel) => Math.max(reel.workflowScore || 0, 0)), 1);
 
   const scored = candidates
     .map((reel) => {
       const momentumComponent = normalizeAgainstMax(Math.max(reel.views24hDelta || 0, 0), maxMomentum);
-      const breakoutComponent = normalizeAgainstMax(getPreferredMetric(reel, "breakoutVsAgeMedian", "breakoutScore"), maxBreakout);
-      const shareIntentComponent = normalizeAgainstMax(getPreferredMetric(reel, "shareRateVsMedian", "shareRate"), maxShareIntent);
-      const saveIntentComponent = normalizeAgainstMax(getPreferredMetric(reel, "saveRateVsMedian", "saveRate"), maxSaveIntent);
-      const engagementComponent = normalizeAgainstMax(getPreferredMetric(reel, "engagementVsAgeMedian", "engagementRate"), maxEngagement);
-      const workflowComponent = normalizeAgainstMax(Math.max(reel.workflowScore || 0, 0), maxWorkflow);
+      // Use percentile scores directly (already 0-100, normalize to 0-1)
+      const performanceComponent = (reel.performanceScore || 50) / 100;
+      const shareIntentComponent = (reel.sharesPercentile || 50) / 100;
+      const saveIntentComponent = (reel.savesPercentile || 50) / 100;
+      const engagementComponent = (reel.engagementPercentile || 50) / 100;
       const baseSignal =
         0.08 +
         0.3 * momentumComponent +
-        0.24 * breakoutComponent +
+        0.24 * performanceComponent +
         0.15 * shareIntentComponent +
         0.12 * saveIntentComponent +
-        0.07 * engagementComponent +
-        0.04 * workflowComponent;
-      const driverScore = reel.recencyWeight * getDecisionWeight(reel) * getAnomalyWeight(reel) * baseSignal;
+        0.11 * engagementComponent;
+      const driverScore = reel.recencyWeight * getDecisionWeight(reel) * getPerformanceWeight(reel) * baseSignal;
 
       return {
         ...reel,

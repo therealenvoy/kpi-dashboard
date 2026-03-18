@@ -42,7 +42,7 @@ export default function ContentScoringRoadmap({ roadmap, onApplyDecision, onSele
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Example reel</p>
                 <p className="mt-2 text-sm leading-6 text-slate-200">{truncate(lane.sampleReel.caption, 92)}</p>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs uppercase tracking-[0.12em] text-slate-500">
-                  <span>{formatCompactNumber(lane.sampleReel.workflowScore)} score</span>
+                  <span>{lane.sampleReel.performanceScore ?? 0}/100</span>
                   <span>{formatCompactNumber(lane.sampleReel.views)} views</span>
                 </div>
               </button>

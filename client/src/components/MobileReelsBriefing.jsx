@@ -18,7 +18,7 @@ function MobileMetric({ label, value, tone = "text-white" }) {
 
 export default function MobileReelsBriefing({ summary, topReels, onSelectReel }) {
   const scaleLane = summary?.workflowRoadmap?.find((lane) => lane.key === "scale");
-  const winning = summary?.highlights?.scale || summary?.highlights?.breakoutScore || null;
+  const winning = summary?.highlights?.scale || summary?.highlights?.bestPerformer || null;
   const weakReel = summary?.highlights?.underperforming || summary?.highlights?.drop || null;
   const repeatPattern = Object.entries(summary?.winnersPatterns?.captionBand || {}).sort((a, b) => (b[1] || 0) - (a[1] || 0))[0]?.[0] || "short";
   const topThree = (topReels || []).slice(0, 3);

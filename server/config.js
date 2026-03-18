@@ -1,4 +1,4 @@
-// Centralized configuration — all magic numbers and thresholds live here.
+// Centralized configuration — all thresholds and constants live here.
 
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -9,48 +9,21 @@ const AGE_BUCKETS = [
   { key: "7d+", label: "7d+", minHours: 168, maxHours: Number.POSITIVE_INFINITY }
 ];
 
-const WORKFLOW_THRESHOLDS = {
-  scale: {
-    breakoutVsAgeMedian: 1.2,
-    engagementVsAgeMedian: 0.95,
-    intentMinimum: 1,
-    anomalyBreakout: 1.1
+// Percentile-based workflow decisions:
+// Top performers → Scale, Bottom performers → Drop, Middle → Watch
+const WORKFLOW = {
+  scalePercentile: 75,   // top 25% → scale
+  dropPercentile: 25,    // bottom 25% → drop
+  // Dimension weights for the composite performance score
+  weights: {
+    views: 25,
+    engagement: 30,
+    saves: 25,
+    shares: 20
   },
-  drop: {
-    breakoutVsAgeMedian: 0.85,
-    engagementVsAgeMedian: 0.8,
-    minAgeDaysStrict: 1,
-    minAgeDaysRelaxed: 2
-  },
-  anomaly: {
-    overperformingThreshold: 1.45,
-    underperformingThreshold: 0.72
-  }
-};
-
-const WORKFLOW_WEIGHTS = {
-  breakout: 38,
-  engagement: 22,
-  views: 16,
-  saveRate: 10,
-  shareRate: 12,
-  momentum: 8,
-  slowdownBonus: 6,
-  freshBonus: 5
-};
-
-const ENRICHMENT = {
-  engagementBands: {
-    low: { max: 2 },
-    medium: { max: 4 }
-    // high: >= 4
-  },
-  breakoutWeights: {
-    engagementRate: 18,
-    saveRate: 35,
-    shareRate: 45,
-    likeRate: 8
-  }
+  // Minimum age in days before a reel can be classified as "drop"
+  // (give fresh content time to find its audience)
+  dropMinAgeDays: 1
 };
 
 const CACHE_TTL_SECONDS = 60 * 60;
@@ -60,9 +33,7 @@ const SHEETS_BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 module.exports = {
   WEEKDAY_KEYS,
   AGE_BUCKETS,
-  WORKFLOW_THRESHOLDS,
-  WORKFLOW_WEIGHTS,
-  ENRICHMENT,
+  WORKFLOW,
   CACHE_TTL_SECONDS,
   VIEWER_COOKIE_NAME,
   SHEETS_BASE_URL

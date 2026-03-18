@@ -28,7 +28,7 @@ export function buildAlerts(allReels) {
     // Dropping: underperforming with negative momentum
     if (
       (reel.slowdownScore || 0) < -500 &&
-      reel.anomalyStatus === "underperforming" &&
+      reel.performanceStatus === "underperforming" &&
       reel.workflowDecision !== "drop"
     ) {
       alerts.push({
@@ -41,7 +41,7 @@ export function buildAlerts(allReels) {
     }
 
     // Breakout: overperforming fresh reel
-    if (reel.anomalyStatus === "overperforming" && (reel.ageDays || 0) <= 3) {
+    if (reel.performanceStatus === "outperforming" && (reel.ageDays || 0) <= 3) {
       alerts.push({
         reelId: reel.reelId,
         reel,

@@ -81,7 +81,6 @@ export default function ReelModal({
   const chartData = buildChartData(snapshots, compareSnapshots, benchmarkSnapshots);
   const compareReel = compareOptions.find((option) => option.reelId === compareReelId);
   const benchmarkViewsMultiplier = benchmarks?.medianViews ? reel.views / benchmarks.medianViews : 0;
-  const benchmarkBreakoutMultiplier = benchmarks?.medianBreakoutScore ? reel.breakoutScore / benchmarks.medianBreakoutScore : 0;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-md">
@@ -119,16 +118,16 @@ export default function ReelModal({
               </div>
               <div className="mt-5 grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Anomaly</p>
-                  <p className="mt-2 font-semibold capitalize text-white">{reel.anomalyStatus}</p>
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Performance score</p>
+                  <p className="mt-2 font-semibold text-white">{reel.performanceScore ?? "—"}<span className="text-slate-400">/100</span></p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                   <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Views vs median</p>
                   <p className="mt-2 font-semibold text-white">{formatMultiplier(benchmarkViewsMultiplier)}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Breakout vs median</p>
-                  <p className="mt-2 font-semibold text-white">{formatMultiplier(benchmarkBreakoutMultiplier)}</p>
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Status</p>
+                  <p className="mt-2 font-semibold capitalize text-white">{reel.performanceStatus || "normal"}</p>
                 </div>
               </div>
             </div>
@@ -201,14 +200,14 @@ export default function ReelModal({
                   <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getWorkflowTone(reel.workflowDecision)}`}>
                     {formatDecisionLabel(reel.workflowDecision)}
                   </span>
-                  <span className="text-sm text-slate-400">{formatCompactNumber(reel.workflowScore)} pts</span>
+                  <span className="text-sm text-slate-400">{reel.performanceScore ?? 0}/100</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-300">{reel.workflowHeadline}</p>
               </div>
-              <Metric label="Engagement rate" value={formatPercent(reel.engagementRate)} helper={`${formatMultiplier(reel.engagementVsAgeMedian)} age median`} />
-              <Metric label="Views" value={formatFullNumber(reel.views)} helper={`${formatMultiplier(reel.viewsVsAgeMedian)} age median`} />
+              <Metric label="Engagement" value={formatPercent(reel.engagementRate)} helper={`Top ${100 - (reel.engagementPercentile || 50)}% for age`} />
+              <Metric label="Views" value={formatFullNumber(reel.views)} helper={`Top ${100 - (reel.viewsPercentile || 50)}% for age`} />
               <Metric label="Reach" value={formatFullNumber(reel.reach)} helper={`${formatCompactNumber(reel.viewsPerDay)} views/day`} />
-              <Metric label="Breakout" value={formatCompactNumber(reel.breakoutScore)} helper={`${formatMultiplier(reel.breakoutVsAgeMedian)} age median`} />
+              <Metric label="Saves" value={formatPercent(reel.saveRate)} helper={`Top ${100 - (reel.savesPercentile || 50)}% for age`} />
               <Metric label="24h momentum" value={formatSignedCompactNumber(reel.views24hDelta)} helper={`${formatSignedCompactNumber(reel.slowdownScore)} vs 7d pace`} />
               <Metric label="Save rate" value={formatPercent(reel.saveRate)} helper={`${formatPercent(reel.shareRate)} share rate`} />
               <Metric label="Shares" value={formatFullNumber(reel.shares)} helper={`${formatPercent(reel.likeRate)} like rate`} />
@@ -221,7 +220,7 @@ export default function ReelModal({
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-300">
                   <span>{formatCompactNumber(compareReel.views)} views</span>
                   <span>{formatPercent(compareReel.engagementRate)} ER</span>
-                  <span>{formatCompactNumber(compareReel.breakoutScore)} breakout</span>
+                  <span>{compareReel.performanceScore ?? 0}/100 score</span>
                   <span>{formatPercent(compareReel.saveRate)} save rate</span>
                 </div>
               </div>
@@ -230,10 +229,8 @@ export default function ReelModal({
             <div className="rounded-[2rem] border border-white/10 bg-black/20 p-5">
               <p className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Derived insights</p>
               <div className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
-                <p>This reel is outperforming the 30-day median by {formatMultiplier(benchmarkViewsMultiplier)} on views.</p>
-                <p>Its breakout score is {formatMultiplier(benchmarkBreakoutMultiplier)} the current median breakout.</p>
-                <p>The anomaly engine classifies it as <span className="capitalize text-white">{reel.anomalyStatus}</span>.</p>
-                <p>The workflow score says <span className="text-white">{formatDecisionLabel(reel.workflowDecision)}</span>: {reel.workflowAction}</p>
+                <p>This reel scores <span className="text-white">{reel.performanceScore ?? 0}/100</span> against {reel.ageBucket} peers — {formatMultiplier(benchmarkViewsMultiplier)} the median on views.</p>
+                <p>Decision: <span className="text-white">{formatDecisionLabel(reel.workflowDecision)}</span> — {reel.workflowAction}</p>
                 {reel.workflowReasons?.length ? (
                   <span className="block text-slate-400">{reel.workflowReasons.join(" ")}</span>
                 ) : null}

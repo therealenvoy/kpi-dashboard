@@ -1,39 +1,42 @@
-// Reel enrichment and workflow decision logic.
-// Takes raw reel data and adds computed fields: age, rates, breakout score, workflow decisions.
+// Reel enrichment and percentile-based scoring.
+//
+// Instead of inventing a "breakout score" from arbitrary weights,
+// we rank each reel against its age peers on 4 clear dimensions:
+//   views, engagement rate, save rate, share rate
+// Each dimension becomes a percentile (0-100).
+// The final performanceScore = weighted average of percentiles.
+// Workflow decision = top 25% → scale, bottom 25% → drop, middle → watch.
 
-const { WEEKDAY_KEYS, AGE_BUCKETS, WORKFLOW_THRESHOLDS, WORKFLOW_WEIGHTS, ENRICHMENT } = require("../config");
-const { roundMetric, computeRate, normalizeCountryCode, getMedian } = require("./parsers");
+const { WEEKDAY_KEYS, AGE_BUCKETS, WORKFLOW } = require("../config");
+const { roundMetric, computeRate, normalizeCountryCode } = require("./parsers");
 
 function getWeekdayKey(value) {
-  if (!value) {
-    return "";
-  }
-
+  if (!value) return "";
   return WEEKDAY_KEYS[new Date(value).getUTCDay()] || "";
 }
 
 function getAgeBucket(ageHours) {
-  return AGE_BUCKETS.find((bucket) => ageHours >= bucket.minHours && ageHours < bucket.maxHours) || AGE_BUCKETS[AGE_BUCKETS.length - 1];
+  return AGE_BUCKETS.find((b) => ageHours >= b.minHours && ageHours < b.maxHours) || AGE_BUCKETS[AGE_BUCKETS.length - 1];
 }
 
 function getEngagementBand(rate) {
-  if (rate < ENRICHMENT.engagementBands.low.max) {
-    return "low";
-  }
-  if (rate < ENRICHMENT.engagementBands.medium.max) {
-    return "medium";
-  }
+  if (rate < 2) return "low";
+  if (rate < 4) return "medium";
   return "high";
 }
 
-function getWorkflowPriority(decision) {
-  if (decision === "scale") {
-    return 3;
+// Compute the percentile rank of `value` within a sorted array of values.
+// Returns 0-100 where 100 means the value is higher than all peers.
+function percentileRank(value, sortedValues) {
+  if (!sortedValues.length) return 50;
+  if (sortedValues.length === 1) return 50;
+
+  let below = 0;
+  for (let i = 0; i < sortedValues.length; i++) {
+    if (sortedValues[i] < value) below++;
+    else break;
   }
-  if (decision === "watch") {
-    return 2;
-  }
-  return 1;
+  return roundMetric((below / (sortedValues.length - 1)) * 100, 0);
 }
 
 function getWorkflowMeta(decision) {
@@ -41,107 +44,40 @@ function getWorkflowMeta(decision) {
     case "scale":
       return {
         label: "Scale",
-        headline: "This is winning fast enough to repeat or amplify now.",
-        action: "Reuse the hook, consider more distribution, and brief the next follow-up from this pattern."
+        headline: "Top performer for its age — repeat or amplify this format.",
+        action: "Repost on stories, create a sequel, or boost. This pattern is working."
       };
     case "drop":
       return {
         label: "Drop",
-        headline: "This is below benchmark for its age and should not guide the next creative decision.",
-        action: "Do not repeat this format yet. Capture the lesson, then move effort to stronger concepts."
+        headline: "Below average for its age — don't let this guide your next post.",
+        action: "Note what didn't land, then move effort to stronger concepts."
       };
     default:
       return {
         label: "Watch",
-        headline: "This has some signal, but it needs another check before you commit more effort.",
-        action: "Watch the next 24 hours, compare against age peers, and only scale if momentum improves."
+        headline: "Average performance — check again in 24 hours before deciding.",
+        action: "Wait for the next data refresh. Only scale if it climbs into the top quartile."
       };
   }
 }
 
-function buildWorkflowDecision(reel, ratios) {
-  const thresholds = WORKFLOW_THRESHOLDS;
-  const weights = WORKFLOW_WEIGHTS;
-  const reasons = [];
-  const momentumWeight = reel.views24hDelta > 0 ? Math.min(reel.views24hDelta / 10000, 1.8) : Math.max(reel.views24hDelta / 10000, -1.2);
-  const rawScore =
-    ratios.breakoutVsAgeMedian * weights.breakout +
-    ratios.engagementVsAgeMedian * weights.engagement +
-    ratios.viewsVsAgeMedian * weights.views +
-    ratios.saveRateVsMedian * weights.saveRate +
-    ratios.shareRateVsMedian * weights.shareRate +
-    momentumWeight * weights.momentum +
-    (reel.slowdownScore > 0 ? weights.slowdownBonus : -weights.slowdownBonus) +
-    (reel.ageDays <= 3 && reel.views24hDelta > 0 ? weights.freshBonus : 0);
-
-  let decision = "watch";
-
-  if (
-    (ratios.breakoutVsAgeMedian >= thresholds.scale.breakoutVsAgeMedian &&
-      ratios.engagementVsAgeMedian >= thresholds.scale.engagementVsAgeMedian &&
-      (ratios.shareRateVsMedian >= thresholds.scale.intentMinimum || ratios.saveRateVsMedian >= thresholds.scale.intentMinimum)) ||
-    (ratios.anomalyStatus === "overperforming" && ratios.breakoutVsAgeMedian >= thresholds.scale.anomalyBreakout)
-  ) {
-    decision = "scale";
-  } else if (
-    (reel.ageDays >= thresholds.drop.minAgeDaysStrict && ratios.anomalyStatus === "underperforming" && ratios.breakoutVsAgeMedian <= thresholds.drop.breakoutVsAgeMedian) ||
-    (reel.ageDays >= thresholds.drop.minAgeDaysRelaxed && ratios.engagementVsAgeMedian <= thresholds.drop.engagementVsAgeMedian && reel.slowdownScore < 0)
-  ) {
-    decision = "drop";
-  }
-
-  if (ratios.breakoutVsAgeMedian >= 1.15) {
-    reasons.push(`Breakout is ${roundMetric(ratios.breakoutVsAgeMedian, 2)}x the age median.`);
-  } else if (ratios.breakoutVsAgeMedian <= 0.9) {
-    reasons.push(`Breakout is only ${roundMetric(ratios.breakoutVsAgeMedian, 2)}x the age median.`);
-  }
-
-  if (ratios.engagementVsAgeMedian >= 1.1) {
-    reasons.push(`Engagement is above age peers at ${roundMetric(ratios.engagementVsAgeMedian, 2)}x median.`);
-  } else if (ratios.engagementVsAgeMedian <= 0.85) {
-    reasons.push(`Engagement is lagging age peers at ${roundMetric(ratios.engagementVsAgeMedian, 2)}x median.`);
-  }
-
-  if (ratios.shareRateVsMedian >= 1.1 || ratios.saveRateVsMedian >= 1.1) {
-    reasons.push("Share/save intent is stronger than the current baseline.");
-  }
-
-  if (reel.slowdownScore < 0) {
-    reasons.push(`Momentum is slowing by ${Math.abs(reel.slowdownScore)} versus the 7-day pace.`);
-  } else if (reel.views24hDelta > 0) {
-    reasons.push("24h momentum is still positive.");
-  }
-
-  const meta = getWorkflowMeta(decision);
-
-  return {
-    workflowDecision: decision,
-    workflowLabel: meta.label,
-    workflowScore: Math.max(roundMetric(rawScore, 0), 0),
-    workflowPriority: getWorkflowPriority(decision),
-    workflowHeadline: meta.headline,
-    workflowAction: meta.action,
-    workflowReasons: reasons.slice(0, 3)
-  };
-}
-
+// Enrich a single reel with computed fields (age, rates, etc.)
+// Does NOT assign performanceScore — that requires peer context (see scoreReelsInContext).
 function enrichReel(rawReel) {
-  const bw = ENRICHMENT.breakoutWeights;
   const postedTimestamp = rawReel.postedAt ? new Date(rawReel.postedAt).getTime() : null;
   const ageHours = postedTimestamp ? Math.max((Date.now() - postedTimestamp) / (1000 * 60 * 60), 1) : 0;
   const ageDays = ageHours / 24;
   const saveRate = computeRate(rawReel.saves, rawReel.views || rawReel.reach);
   const shareRate = computeRate(rawReel.shares, rawReel.views || rawReel.reach);
   const likeRate = computeRate(rawReel.likes, rawReel.views || rawReel.reach);
-  const effectiveMomentumWindow = Math.max(Math.min(ageHours, 24), 6);
-  const hourlyMomentum = rawReel.views24hDelta / effectiveMomentumWindow;
-  const breakoutScore =
-    hourlyMomentum + rawReel.engagementRate * bw.engagementRate + saveRate * bw.saveRate + shareRate * bw.shareRate + likeRate * bw.likeRate;
   const ageBucket = getAgeBucket(ageHours);
   const weekday = getWeekdayKey(rawReel.postedAt);
   const captionLength = (rawReel.caption || "").trim().length;
   const captionBand = captionLength < 40 ? "short" : captionLength < 90 ? "medium" : "long";
   const topCountryCodes = (rawReel.topCountries || []).map(normalizeCountryCode).filter(Boolean);
+  const viewsPerDay = rawReel.views / Math.max(ageDays, 1);
+  const slowdownScore = roundMetric(rawReel.views24hDelta - rawReel.views7dDelta / 7, 1);
 
   return {
     ...rawReel,
@@ -155,73 +91,110 @@ function enrichReel(rawReel) {
     saveRate: roundMetric(saveRate),
     shareRate: roundMetric(shareRate),
     likeRate: roundMetric(likeRate),
-    breakoutScore: roundMetric(breakoutScore, 1)
+    viewsPerDay: roundMetric(viewsPerDay, 0),
+    slowdownScore,
+    engagementBand: getEngagementBand(rawReel.engagementRate)
   };
 }
 
-function annotateContextualReels(reels, benchmarks) {
-  const anomalyThresholds = WORKFLOW_THRESHOLDS.anomaly;
+// Score all reels against their age-bucket peers using percentile ranking.
+// This is the core of the new scoring system.
+function scoreReelsInContext(enrichedReels) {
+  const w = WORKFLOW.weights;
+  const totalWeight = w.views + w.engagement + w.saves + w.shares;
 
-  return reels.map((reel) => {
-    const ageBucketBench = benchmarks.ageBuckets[reel.ageBucket] || {};
-    const baselineViews = ageBucketBench.medianViews || benchmarks.medianViews || 1;
-    const baselineBreakout = ageBucketBench.medianBreakoutScore || benchmarks.medianBreakoutScore || 1;
-    const baselineEngagement = ageBucketBench.medianEngagementRate || benchmarks.medianEngagementRate || 1;
-    const baselineSaveRate = benchmarks.medianSaveRate || 1;
-    const baselineShareRate = benchmarks.medianShareRate || 1;
-    const viewsVsMedian = reel.views / (benchmarks.medianViews || 1);
-    const viewsVsAgeMedian = reel.views / baselineViews;
-    const breakoutVsMedian = reel.breakoutScore / (benchmarks.medianBreakoutScore || 1);
-    const breakoutVsAgeMedian = reel.breakoutScore / baselineBreakout;
-    const engagementVsMedian = reel.engagementRate / (benchmarks.medianEngagementRate || 1);
-    const engagementVsAgeMedian = reel.engagementRate / baselineEngagement;
-    const viewsPerDay = reel.views / Math.max(reel.ageDays, 1);
-    const slowdownScore = roundMetric(reel.views24hDelta - reel.views7dDelta / 7, 1);
-    const anomalyScore = breakoutVsAgeMedian * 0.55 + engagementVsAgeMedian * 0.3 + viewsVsAgeMedian * 0.15;
-    const anomalyStatus =
-      anomalyScore >= anomalyThresholds.overperformingThreshold ? "overperforming" :
-      anomalyScore <= anomalyThresholds.underperformingThreshold ? "underperforming" : "normal";
-    const saveRateVsMedian = reel.saveRate / baselineSaveRate;
-    const shareRateVsMedian = reel.shareRate / baselineShareRate;
-    const annotatedReel = {
-      ...reel,
-      viewsPerDay: roundMetric(viewsPerDay, 0),
-      viewsVsMedian: roundMetric(viewsVsMedian, 2),
-      viewsVsAgeMedian: roundMetric(viewsVsAgeMedian, 2),
-      breakoutVsMedian: roundMetric(breakoutVsMedian, 2),
-      breakoutVsAgeMedian: roundMetric(breakoutVsAgeMedian, 2),
-      engagementVsMedian: roundMetric(engagementVsMedian, 2),
-      engagementVsAgeMedian: roundMetric(engagementVsAgeMedian, 2),
-      saveRateVsMedian: roundMetric(saveRateVsMedian, 2),
-      shareRateVsMedian: roundMetric(shareRateVsMedian, 2),
-      slowdownScore,
-      anomalyScore: roundMetric(anomalyScore, 2),
-      anomalyStatus,
-      engagementBand: getEngagementBand(reel.engagementRate)
+  // Group reels by age bucket
+  const bucketGroups = {};
+  for (const reel of enrichedReels) {
+    if (!bucketGroups[reel.ageBucket]) bucketGroups[reel.ageBucket] = [];
+    bucketGroups[reel.ageBucket].push(reel);
+  }
+
+  // Pre-sort each dimension within each bucket for percentile calculation
+  const bucketSorted = {};
+  for (const [bucket, reels] of Object.entries(bucketGroups)) {
+    bucketSorted[bucket] = {
+      views: [...reels].sort((a, b) => a.views - b.views).map((r) => r.views),
+      engagement: [...reels].sort((a, b) => a.engagementRate - b.engagementRate).map((r) => r.engagementRate),
+      saves: [...reels].sort((a, b) => a.saveRate - b.saveRate).map((r) => r.saveRate),
+      shares: [...reels].sort((a, b) => a.shareRate - b.shareRate).map((r) => r.shareRate)
     };
-    const workflowDecision = buildWorkflowDecision(annotatedReel, {
-      viewsVsAgeMedian,
-      breakoutVsAgeMedian,
-      engagementVsAgeMedian,
-      saveRateVsMedian,
-      shareRateVsMedian,
-      anomalyStatus
-    });
+  }
+
+  return enrichedReels.map((reel) => {
+    const sorted = bucketSorted[reel.ageBucket];
+
+    const viewsPercentile = percentileRank(reel.views, sorted.views);
+    const engagementPercentile = percentileRank(reel.engagementRate, sorted.engagement);
+    const savesPercentile = percentileRank(reel.saveRate, sorted.saves);
+    const sharesPercentile = percentileRank(reel.shareRate, sorted.shares);
+
+    const performanceScore = roundMetric(
+      (viewsPercentile * w.views +
+        engagementPercentile * w.engagement +
+        savesPercentile * w.saves +
+        sharesPercentile * w.shares) / totalWeight,
+      0
+    );
+
+    // Determine workflow decision from percentile
+    let workflowDecision = "watch";
+    if (performanceScore >= WORKFLOW.scalePercentile) {
+      workflowDecision = "scale";
+    } else if (performanceScore <= WORKFLOW.dropPercentile && reel.ageDays >= WORKFLOW.dropMinAgeDays) {
+      workflowDecision = "drop";
+    }
+
+    const meta = getWorkflowMeta(workflowDecision);
+
+    // Build human-readable reasons
+    const reasons = [];
+    if (viewsPercentile >= 80) reasons.push(`Views in top ${100 - viewsPercentile}% for ${reel.ageBucket} reels.`);
+    else if (viewsPercentile <= 20) reasons.push(`Views in bottom ${viewsPercentile}% for ${reel.ageBucket} reels.`);
+
+    if (engagementPercentile >= 80) reasons.push(`Engagement in top ${100 - engagementPercentile}% of age peers.`);
+    else if (engagementPercentile <= 20) reasons.push(`Engagement in bottom ${engagementPercentile}% of age peers.`);
+
+    if (savesPercentile >= 75 || sharesPercentile >= 75) {
+      reasons.push("Strong save/share intent — audience wants to keep or spread this.");
+    } else if (savesPercentile <= 20 && sharesPercentile <= 20) {
+      reasons.push("Low save/share intent — content isn't compelling enough to act on.");
+    }
+
+    if (reel.slowdownScore < 0) {
+      reasons.push("Momentum is slowing compared to 7-day pace.");
+    } else if (reel.views24hDelta > 0 && reel.ageDays <= 3) {
+      reasons.push("Still gaining views — momentum is active.");
+    }
 
     return {
-      ...annotatedReel,
-      ...workflowDecision
+      ...reel,
+      // New percentile-based fields
+      performanceScore,
+      viewsPercentile,
+      engagementPercentile,
+      savesPercentile,
+      sharesPercentile,
+      // Workflow decision (same field names for backward compat)
+      workflowDecision,
+      workflowLabel: meta.label,
+      workflowScore: performanceScore, // alias for backward compat
+      workflowPriority: workflowDecision === "scale" ? 3 : workflowDecision === "watch" ? 2 : 1,
+      workflowHeadline: meta.headline,
+      workflowAction: meta.action,
+      workflowReasons: reasons.slice(0, 3),
+      // Simplified status (replaces anomalyScore/anomalyStatus)
+      performanceStatus: performanceScore >= 75 ? "outperforming" : performanceScore <= 25 ? "underperforming" : "normal"
     };
   });
 }
 
 module.exports = {
   enrichReel,
-  annotateContextualReels,
-  buildWorkflowDecision,
+  scoreReelsInContext,
+  percentileRank,
   getEngagementBand,
   getAgeBucket,
   getWeekdayKey,
-  getWorkflowPriority,
   getWorkflowMeta
 };
