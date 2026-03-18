@@ -1,23 +1,14 @@
 import { startTransition, useDeferredValue, useEffect, useReducer, useState } from "react";
-import { fetchAccount, fetchPaidSubsSummary, fetchReels, fetchReport, fetchSnapshotsWithCompare, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
+import { fetchAccount, fetchPaidSubsSummary, fetchReels, fetchReport, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
 import {
   formatCompactNumber,
   formatMultiplier,
   formatPercent,
   formatRelative
 } from "./lib/formatters";
-import DashboardFilters from "./components/DashboardFilters";
 import KpiCard from "./components/KpiCard";
-import LifecycleView from "./components/LifecycleView";
-import MobileReelsBriefing from "./components/MobileReelsBriefing";
-import MobileDecisionFeed from "./components/MobileDecisionFeed";
-import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
-import CorrelationInsightsStrip from "./components/CorrelationInsightsStrip";
-import CorrelationPanel from "./components/CorrelationPanel";
 import PaidSubsSparkline from "./components/PaidSubsSparkline";
-import ReelModal from "./components/ReelModal";
-import ReelsTable from "./components/ReelsTable";
-import ReportPanel from "./components/ReportPanel";
+import ReelCardList from "./components/ReelCardList";
 import MonetizationPage from "./pages/MonetizationPage";
 import MonetizationPasswordPrompt from "./components/MonetizationPasswordPrompt";
 
@@ -25,14 +16,7 @@ const PAGE_SIZE = 25;
 
 const INITIAL_FILTERS = {
   q: "",
-  preset: "",
-  boosted: "all",
-  surface: "all",
-  topCountry: "",
-  engagementBand: "all",
-  workflowDecision: "all",
-  weekday: "all",
-  minViews: "0"
+  workflowDecision: "all"
 };
 
 const INITIAL_STATE = {
@@ -76,14 +60,7 @@ function buildBaseParams(timeframe, filters, deferredQuery) {
   return {
     timeframe,
     q: deferredQuery,
-    preset: filters.preset,
-    boosted: filters.boosted,
-    surface: filters.surface,
-    topCountry: filters.topCountry,
-    engagementBand: filters.engagementBand,
-    workflowDecision: filters.workflowDecision,
-    weekday: filters.weekday,
-    minViews: Number(filters.minViews) || 0
+    workflowDecision: filters.workflowDecision
   };
 }
 
@@ -98,14 +75,10 @@ export default function App() {
   const [state, dispatch] = useReducer(dashboardReducer, INITIAL_STATE);
   const { account, tableData, summary, report, pagination, paidSubsSummary, refreshMeta, loading, hasLoadedOnce, error } = state;
 
-  const [sort, setSort] = useState("postedAt");
+  const [sort, setSort] = useState("linkTaps");
   const [order, setOrder] = useState("desc");
   const [timeframe, setTimeframe] = useState("30d");
   const [page, setPage] = useState(1);
-  const [selectedReel, setSelectedReel] = useState(null);
-  const [compareReelId, setCompareReelId] = useState("");
-  const [snapshotPayload, setSnapshotPayload] = useState({ data: [], compare: null, benchmark: [] });
-  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [clockTick, setClockTick] = useState(Date.now());
   const [dashboardMode, setDashboardMode] = useState("reels");
@@ -191,19 +164,7 @@ export default function App() {
 
     loadDashboard();
     return () => { ignore = true; };
-  }, [deferredQuery, filters.boosted, filters.engagementBand, filters.minViews, filters.preset, filters.surface, filters.topCountry, filters.workflowDecision, filters.weekday, order, page, refreshNonce, sort, timeframe, dashboardMode]);
-
-  // Snapshot loading
-  useEffect(() => {
-    if (dashboardMode !== "reels" || !selectedReel) return undefined;
-    let ignore = false;
-    setLoadingSnapshots(true);
-    fetchSnapshotsWithCompare(selectedReel.reelId, compareReelId || undefined)
-      .then((r) => { if (!ignore) setSnapshotPayload(r); })
-      .catch(() => { if (!ignore) setSnapshotPayload({ data: [], compare: null, benchmark: [] }); })
-      .finally(() => { if (!ignore) setLoadingSnapshots(false); });
-    return () => { ignore = true; };
-  }, [compareReelId, selectedReel, dashboardMode]);
+  }, [deferredQuery, filters.workflowDecision, order, page, refreshNonce, sort, timeframe, dashboardMode]);
 
   function handleSortChange(nextSort) {
     if (sort === nextSort) { setOrder((c) => (c === "asc" ? "desc" : "asc")); }
@@ -224,16 +185,6 @@ export default function App() {
   function resetFilters() {
     setFilters(INITIAL_FILTERS);
     startTransition(() => setPage(1));
-  }
-
-  function handleSelectReel(reel) {
-    setSelectedReel(reel);
-    setCompareReelId("");
-  }
-
-  async function handleCopySummary() {
-    if (!report?.markdown) return;
-    try { await navigator.clipboard.writeText(report.markdown); } catch (_e) {}
   }
 
   async function handleLockAdminView() {
@@ -266,8 +217,6 @@ export default function App() {
 
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
   const showInitialLoading = loading && !hasLoadedOnce;
-  const exportUrl = `/api/reels/export.csv?${new URLSearchParams(buildBaseParams(timeframe, filters, deferredQuery)).toString()}`;
-  const compareOptions = tableData.filter((reel) => reel?.reelId && reel.reelId !== selectedReel?.reelId);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1520px] flex-col gap-8 px-4 py-5 sm:px-6 lg:px-8">
@@ -304,6 +253,7 @@ export default function App() {
         <MonetizationPage />
       ) : (
         <>
+          {/* Hero: KPI strip */}
           <section className="hero-shell relative overflow-hidden px-6 py-5 md:px-8 md:py-6">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_8%,rgba(215,184,120,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_34%)]" />
             <div className="relative space-y-4">
@@ -361,92 +311,70 @@ export default function App() {
             <>
               {loading ? (
                 <section className="panel border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-slate-300">
-                  Refreshing the current view without resetting your scroll position…
+                  Refreshing…
                 </section>
               ) : null}
 
-              <MobileReelsBriefing summary={summary} topReels={tableData.slice(0, 5)} onSelectReel={handleSelectReel} />
-
-              <CorrelationInsightsStrip />
-
-              {(() => {
-                const scaleCount = tableData.filter((r) => r.workflowDecision === "scale").length;
-                const watchCount = tableData.filter((r) => r.workflowDecision === "watch").length;
-                const dropCount = tableData.filter((r) => r.workflowDecision === "drop").length;
-                return (
-                  <div className="flex flex-wrap items-center gap-2">
+              {/* Sort bar + search + decision pills */}
+              <section className="space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Sort pills */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Sort</span>
                     {[
-                      { key: "all", label: `All ${tableData.length}`, count: tableData.length },
-                      { key: "scale", label: `Scale ${scaleCount}`, count: scaleCount },
-                      { key: "watch", label: `Watch ${watchCount}`, count: watchCount },
-                      { key: "drop", label: `Drop ${dropCount}`, count: dropCount }
+                      { key: "linkTaps", label: "Link taps" },
+                      { key: "views", label: "Views" },
+                      { key: "saves", label: "Saves" },
+                      { key: "shares", label: "Shares" },
+                      { key: "performance", label: "Score" },
+                      { key: "postedAt", label: "Newest" }
                     ].map((item) => (
-                      <button key={item.key} type="button"
-                        onClick={() => updateFilter("workflowDecision", item.key === "all" ? "all" : item.key)}
-                        className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                          (filters.workflowDecision === item.key || (item.key === "all" && filters.workflowDecision === "all"))
-                            ? "bg-white/10 text-white"
-                            : "text-slate-500 hover:text-slate-200"
+                      <button key={item.key} type="button" onClick={() => handleSortChange(item.key)}
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                          sort === item.key ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-200"
                         }`}>
-                        {item.label}
+                        {item.label}{sort === item.key ? (order === "desc" ? " ↓" : " ↑") : ""}
                       </button>
                     ))}
                   </div>
-                );
-              })()}
 
-              <section className="space-y-6">
-                <DashboardFilters
-                  query={filters.q} preset={filters.preset} boosted={filters.boosted}
-                  surface={filters.surface} topCountry={filters.topCountry}
-                  engagementBand={filters.engagementBand} workflowDecision={filters.workflowDecision}
-                  weekday={filters.weekday} minViews={filters.minViews}
-                  presets={summary?.presets || []}
-                  countryOptions={account?.countries?.map((c) => c.code) || []}
-                  resultCount={pagination.total}
-                  onQueryChange={(v) => updateFilter("q", v)} onPresetChange={(v) => updateFilter("preset", v)}
-                  onBoostedChange={(v) => updateFilter("boosted", v)} onSurfaceChange={(v) => updateFilter("surface", v)}
-                  onTopCountryChange={(v) => updateFilter("topCountry", v)}
-                  onEngagementBandChange={(v) => updateFilter("engagementBand", v)}
-                  onWorkflowDecisionChange={(v) => updateFilter("workflowDecision", v)}
-                  onWeekdayChange={(v) => updateFilter("weekday", v)}
-                  onMinViewsChange={(v) => updateFilter("minViews", v)}
-                  onReset={resetFilters}
-                />
-
-                <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
-                <div className="mt-6 hidden md:block">
-                  <ReelsTable
-                    reels={tableData} sort={sort} order={order} onSortChange={handleSortChange}
-                    page={page} totalPages={totalPages} totalItems={pagination.total}
-                    onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
-                    onSelectReel={handleSelectReel}
+                  {/* Search */}
+                  <input
+                    type="text" value={filters.q} placeholder="Search reels…"
+                    onChange={(e) => updateFilter("q", e.target.value)}
+                    className="w-full rounded-full border border-white/8 bg-white/[0.03] px-4 py-2 text-[12px] text-slate-200 placeholder-slate-500 outline-none focus:border-white/16 sm:w-56"
                   />
+                </div>
+
+                {/* Decision pills */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { key: "all", label: "All" },
+                    { key: "scale", label: "Scale" },
+                    { key: "watch", label: "Watch" },
+                    { key: "drop", label: "Drop" }
+                  ].map((item) => (
+                    <button key={item.key} type="button"
+                      onClick={() => updateFilter("workflowDecision", item.key)}
+                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        filters.workflowDecision === item.key ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-200"
+                      }`}>
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </section>
 
-              <section className="space-y-6">
-                <CollapsibleAnalysisSection title="Reel → subscriber correlation" description="Which reels were posted before subscription spikes? Statistical patterns over 60 days.">
-                  <CorrelationPanel />
-                </CollapsibleAnalysisSection>
-                <CollapsibleAnalysisSection title="Lifecycle view" description="Inspect where momentum is building or dying across the reel aging curve.">
-                  <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
-                </CollapsibleAnalysisSection>
-                <CollapsibleAnalysisSection title="Operator report" description="Full written readout and export summary.">
-                  <ReportPanel report={report} onCopySummary={handleCopySummary} exportUrl={exportUrl} />
-                </CollapsibleAnalysisSection>
-              </section>
+              {/* Reel cards */}
+              <ReelCardList
+                reels={tableData}
+                page={page}
+                totalPages={totalPages}
+                totalItems={pagination.total}
+                onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
+              />
             </>
           )}
-
-          <ReelModal
-            reel={selectedReel} snapshots={snapshotPayload.data}
-            compareSnapshots={snapshotPayload.compare} benchmarkSnapshots={snapshotPayload.benchmark}
-            compareOptions={compareOptions} compareReelId={compareReelId}
-            onCompareChange={setCompareReelId} benchmarks={summary?.benchmarks}
-            loading={loadingSnapshots}
-            onClose={() => { setSelectedReel(null); setCompareReelId(""); setSnapshotPayload({ data: [], compare: null, benchmark: [] }); }}
-          />
         </>
       )}
       {showPasswordPrompt ? (

@@ -19,6 +19,7 @@ function sortReels(reels, sort, order) {
     saveRate: (reel) => reel.saveRate,
     shareRate: (reel) => reel.shareRate,
     age: (reel) => reel.ageDays,
+    linkTaps: (reel) => reel.linkTaps || 0,
     workflow: (reel) => reel.workflowPriority * 1000 + (reel.performanceScore || 0),
     // Legacy alias
     breakout: (reel) => reel.performanceScore || 0

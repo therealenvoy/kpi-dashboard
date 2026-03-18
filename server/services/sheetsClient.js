@@ -66,7 +66,7 @@ function getRefreshMetadata() {
 }
 
 async function getReelsData() {
-  const rows = await fetchSheetRange("'Reels Performance'!A2:X", "reels-performance");
+  const rows = await fetchSheetRange("'Reels Performance'!A2:Y", "reels-performance");
 
   return rows
     .filter((row) => row[0] && row[1])
@@ -90,7 +90,8 @@ async function getReelsData() {
       paidReach: parseNumber(row[16]),
       engagementRate: parsePercent(row[17]),
       topCountries: [row[18], row[19], row[20], row[21], row[22]].filter(Boolean),
-      lastUpdated: parseDate(row[23])
+      lastUpdated: parseDate(row[23]),
+      linkTaps: parseNumber(row[24])
     }))
     .map(enrichReel)
     .sort((a, b) => new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime());
