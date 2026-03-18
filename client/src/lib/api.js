@@ -57,6 +57,11 @@ export async function fetchPaidSubsSummary() {
   return data;
 }
 
+export async function fetchPaidSubsTrend() {
+  const { data } = await api.get("/monetization/paid-subs-trend");
+  return data;
+}
+
 export async function fetchMonetizationDaily(params) {
   const { data } = await api.get("/monetization/daily", { params });
   return data;

@@ -671,6 +671,24 @@ function createMonetizationRouter({ getReelsData, getContextualReels, canViewRev
     }
   });
 
+  // 7-day paid subs trend for sparkline (no auth required, no earnings exposed)
+  router.get("/paid-subs-trend", async (_req, res, next) => {
+    try {
+      await ensureStoreReady();
+      const rows = await listDailyMetrics(7, 0);
+      const trend = rows
+        .map((row) => ({
+          date: row.date,
+          paidSubs: row.paidSubs || 0,
+          newSubs: row.newSubs || 0
+        }))
+        .reverse(); // oldest first for sparkline
+      res.json({ trend });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
 

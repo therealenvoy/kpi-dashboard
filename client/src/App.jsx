@@ -1,18 +1,18 @@
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useReducer, useState } from "react";
 import { fetchAccount, fetchPaidSubsSummary, fetchReels, fetchReport, fetchSnapshotsWithCompare, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
 import {
   formatCompactNumber,
-  formatDateTime,
   formatMultiplier,
   formatPercent,
   formatRelative
 } from "./lib/formatters";
-import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
 import DashboardFilters from "./components/DashboardFilters";
 import KpiCard from "./components/KpiCard";
 import LifecycleView from "./components/LifecycleView";
 import MobileReelsBriefing from "./components/MobileReelsBriefing";
 import MobileDecisionFeed from "./components/MobileDecisionFeed";
+import CollapsibleAnalysisSection from "./components/CollapsibleAnalysisSection";
+import PaidSubsSparkline from "./components/PaidSubsSparkline";
 import ReelModal from "./components/ReelModal";
 import ReelsTable from "./components/ReelsTable";
 import ReportPanel from "./components/ReportPanel";
@@ -20,6 +20,55 @@ import MonetizationPage from "./pages/MonetizationPage";
 import MonetizationPasswordPrompt from "./components/MonetizationPasswordPrompt";
 
 const PAGE_SIZE = 25;
+
+const INITIAL_FILTERS = {
+  q: "",
+  preset: "",
+  boosted: "all",
+  surface: "all",
+  topCountry: "",
+  engagementBand: "all",
+  workflowDecision: "all",
+  weekday: "all",
+  minViews: "0"
+};
+
+const INITIAL_STATE = {
+  account: null,
+  tableData: [],
+  summary: null,
+  report: null,
+  pagination: { total: 0, limit: PAGE_SIZE, offset: 0, hasMore: false },
+  paidSubsSummary: null,
+  refreshMeta: null,
+  loading: true,
+  hasLoadedOnce: false,
+  error: ""
+};
+
+function dashboardReducer(state, action) {
+  switch (action.type) {
+    case "LOAD_START":
+      return { ...state, loading: true, error: "" };
+    case "LOAD_SUCCESS":
+      return {
+        ...state,
+        account: action.account,
+        tableData: action.tableData,
+        summary: action.summary,
+        pagination: action.pagination,
+        paidSubsSummary: action.paidSubsSummary,
+        report: action.report,
+        refreshMeta: action.refreshMeta,
+        loading: false,
+        hasLoadedOnce: true
+      };
+    case "LOAD_ERROR":
+      return { ...state, loading: false, error: action.error };
+    default:
+      return state;
+  }
+}
 
 function buildBaseParams(timeframe, filters, deferredQuery) {
   return {
@@ -37,113 +86,160 @@ function buildBaseParams(timeframe, filters, deferredQuery) {
 }
 
 function getRefreshCountdown(expiresAt) {
-  if (!expiresAt) {
-    return "Waiting for first sync";
-  }
-
+  if (!expiresAt) return "Waiting for first sync";
   const diffMs = new Date(expiresAt).getTime() - Date.now();
-  if (diffMs <= 0) {
-    return "Refreshing now";
-  }
-
-  const minutes = Math.ceil(diffMs / (1000 * 60));
-  return `Next refresh in ${minutes}m`;
+  if (diffMs <= 0) return "Refreshing now";
+  return `Next refresh in ${Math.ceil(diffMs / (1000 * 60))}m`;
 }
 
 export default function App() {
-  const [account, setAccount] = useState(null);
-  const [tableData, setTableData] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [report, setReport] = useState(null);
-  const [pagination, setPagination] = useState({ total: 0, limit: PAGE_SIZE, offset: 0, hasMore: false });
+  const [state, dispatch] = useReducer(dashboardReducer, INITIAL_STATE);
+  const { account, tableData, summary, report, pagination, paidSubsSummary, refreshMeta, loading, hasLoadedOnce, error } = state;
+
   const [sort, setSort] = useState("postedAt");
   const [order, setOrder] = useState("desc");
   const [timeframe, setTimeframe] = useState("30d");
   const [page, setPage] = useState(1);
-  const [paidSubsSummary, setPaidSubsSummary] = useState(null);
   const [selectedReel, setSelectedReel] = useState(null);
   const [compareReelId, setCompareReelId] = useState("");
   const [snapshotPayload, setSnapshotPayload] = useState({ data: [], compare: null, benchmark: [] });
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [error, setError] = useState("");
-  const [refreshMeta, setRefreshMeta] = useState(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [clockTick, setClockTick] = useState(Date.now());
   const [dashboardMode, setDashboardMode] = useState("reels");
   const [viewerState, setViewerState] = useState({ viewerMode: "worker", canViewRevenue: false, adminCodeConfigured: false });
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [unlockError, setUnlockError] = useState("");
-  const [filters, setFilters] = useState({
-    q: "",
-    preset: "",
-    boosted: "all",
-    surface: "all",
-    topCountry: "",
-    engagementBand: "all",
-    workflowDecision: "all",
-    weekday: "all",
-    minViews: "0"
-  });
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
   const deferredQuery = useDeferredValue(filters.q);
 
+  // Clock tick for refresh countdown
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setClockTick(Date.now());
-    }, 30000);
-
+    const intervalId = window.setInterval(() => setClockTick(Date.now()), 30000);
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // Viewer state
   useEffect(() => {
-    fetchViewer()
-      .then((response) => setViewerState(response))
-      .catch(() => {
-        // Ignore viewer state failures and keep the safe worker default.
-      });
+    fetchViewer().then(setViewerState).catch(() => {});
   }, []);
 
+  // URL-based admin/worker toggle
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const adminCode = params.get("admin");
     const workerMode = params.get("worker");
-
-    if (!adminCode && !workerMode) {
-      return;
-    }
+    if (!adminCode && !workerMode) return;
 
     const cleanUrl = () => {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.delete("admin");
       nextParams.delete("worker");
       const nextQuery = nextParams.toString();
-      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
-      window.history.replaceState({}, "", nextUrl);
+      window.history.replaceState({}, "", `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`);
     };
 
     if (adminCode) {
-      unlockViewer(adminCode)
-        .then((response) => setViewerState((current) => ({ ...current, ...response })))
-        .finally(cleanUrl);
+      unlockViewer(adminCode).then((r) => setViewerState((c) => ({ ...c, ...r }))).finally(cleanUrl);
       return;
     }
-
-    lockViewer()
-      .then((response) => setViewerState((current) => ({ ...current, ...response })))
-      .finally(cleanUrl);
+    lockViewer().then((r) => setViewerState((c) => ({ ...c, ...r }))).finally(cleanUrl);
   }, []);
+
+  // Auto-refresh when cache expires
+  useEffect(() => {
+    if (!refreshMeta?.expiresAt || loading) return;
+    if (Date.now() >= new Date(refreshMeta.expiresAt).getTime()) {
+      setRefreshNonce((c) => c + 1);
+    }
+  }, [clockTick, loading, refreshMeta]);
+
+  // Main data load
+  useEffect(() => {
+    if (dashboardMode !== "reels") return undefined;
+    let ignore = false;
+
+    async function loadDashboard() {
+      dispatch({ type: "LOAD_START" });
+      try {
+        const baseParams = buildBaseParams(timeframe, filters, deferredQuery);
+        const [accountResponse, reelsResponse, reportResponse, paidSubsResponse] = await Promise.all([
+          fetchAccount(),
+          fetchReels({ ...baseParams, sort, order, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+          fetchReport(baseParams),
+          fetchPaidSubsSummary().catch(() => null)
+        ]);
+        if (ignore) return;
+        dispatch({
+          type: "LOAD_SUCCESS",
+          account: accountResponse,
+          tableData: reelsResponse.data,
+          summary: reelsResponse.summary,
+          pagination: reelsResponse.pagination,
+          paidSubsSummary: paidSubsResponse,
+          report: reportResponse,
+          refreshMeta: reelsResponse.refresh || accountResponse.refresh || reportResponse.refresh || null
+        });
+      } catch (requestError) {
+        if (!ignore) {
+          dispatch({ type: "LOAD_ERROR", error: requestError.response?.data?.details?.error?.message || requestError.message || "Unable to load dashboard." });
+        }
+      }
+    }
+
+    loadDashboard();
+    return () => { ignore = true; };
+  }, [deferredQuery, filters.boosted, filters.engagementBand, filters.minViews, filters.preset, filters.surface, filters.topCountry, filters.workflowDecision, filters.weekday, order, page, refreshNonce, sort, timeframe, dashboardMode]);
+
+  // Snapshot loading
+  useEffect(() => {
+    if (dashboardMode !== "reels" || !selectedReel) return undefined;
+    let ignore = false;
+    setLoadingSnapshots(true);
+    fetchSnapshotsWithCompare(selectedReel.reelId, compareReelId || undefined)
+      .then((r) => { if (!ignore) setSnapshotPayload(r); })
+      .catch(() => { if (!ignore) setSnapshotPayload({ data: [], compare: null, benchmark: [] }); })
+      .finally(() => { if (!ignore) setLoadingSnapshots(false); });
+    return () => { ignore = true; };
+  }, [compareReelId, selectedReel, dashboardMode]);
+
+  function handleSortChange(nextSort) {
+    if (sort === nextSort) { setOrder((c) => (c === "asc" ? "desc" : "asc")); }
+    else { setSort(nextSort); setOrder("desc"); }
+    setPage(1);
+  }
+
+  function handleTimeframeChange(nextTimeframe) {
+    setTimeframe(nextTimeframe);
+    setPage(1);
+  }
+
+  function updateFilter(key, value) {
+    setFilters((c) => ({ ...c, [key]: value }));
+    startTransition(() => setPage(1));
+  }
+
+  function resetFilters() {
+    setFilters(INITIAL_FILTERS);
+    startTransition(() => setPage(1));
+  }
+
+  function handleSelectReel(reel) {
+    setSelectedReel(reel);
+    setCompareReelId("");
+  }
+
+  async function handleCopySummary() {
+    if (!report?.markdown) return;
+    try { await navigator.clipboard.writeText(report.markdown); } catch (_e) {}
+  }
 
   async function handleLockAdminView() {
     try {
-      const response = await lockViewer();
-      setViewerState((current) => ({ ...current, ...response }));
-      if (dashboardMode === "monetization") {
-        setDashboardMode("reels");
-      }
-    } catch (_error) {
-      // Ignore lock failures and keep current viewer state visible.
-    }
+      const r = await lockViewer();
+      setViewerState((c) => ({ ...c, ...r }));
+      if (dashboardMode === "monetization") setDashboardMode("reels");
+    } catch (_e) {}
   }
 
   function handleTabClick(key) {
@@ -157,186 +253,12 @@ export default function App() {
   async function handleUnlockSubmit(code) {
     setUnlockError("");
     try {
-      const response = await unlockViewer(code);
-      setViewerState((current) => ({ ...current, ...response }));
+      const r = await unlockViewer(code);
+      setViewerState((c) => ({ ...c, ...r }));
       setShowPasswordPrompt(false);
       setDashboardMode("monetization");
-    } catch (_error) {
+    } catch (_e) {
       setUnlockError("Invalid password.");
-    }
-  }
-
-  useEffect(() => {
-    if (!refreshMeta?.expiresAt || loading) {
-      return;
-    }
-
-    if (Date.now() >= new Date(refreshMeta.expiresAt).getTime()) {
-      setRefreshNonce((current) => current + 1);
-    }
-  }, [clockTick, loading, refreshMeta]);
-
-  useEffect(() => {
-    if (dashboardMode !== "reels") {
-      return undefined;
-    }
-
-    let ignore = false;
-
-    async function loadDashboard() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const baseParams = buildBaseParams(timeframe, filters, deferredQuery);
-        const [accountResponse, reelsResponse, reportResponse, paidSubsResponse] = await Promise.all([
-          fetchAccount(),
-          fetchReels({
-            ...baseParams,
-            sort,
-            order,
-            limit: PAGE_SIZE,
-            offset: (page - 1) * PAGE_SIZE
-          }),
-          fetchReport(baseParams),
-          fetchPaidSubsSummary().catch(() => null)
-        ]);
-
-        if (ignore) {
-          return;
-        }
-
-        setAccount(accountResponse);
-        setTableData(reelsResponse.data);
-        setSummary(reelsResponse.summary);
-        setPagination(reelsResponse.pagination);
-        setPaidSubsSummary(paidSubsResponse);
-        setReport(reportResponse);
-        setRefreshMeta(reelsResponse.refresh || accountResponse.refresh || reportResponse.refresh || null);
-        setHasLoadedOnce(true);
-      } catch (requestError) {
-        if (!ignore) {
-          setError(requestError.response?.data?.details?.error?.message || requestError.message || "Unable to load dashboard.");
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadDashboard();
-    return () => {
-      ignore = true;
-    };
-  }, [
-    deferredQuery,
-    filters.boosted,
-    filters.engagementBand,
-    filters.minViews,
-    filters.preset,
-    filters.surface,
-    filters.topCountry,
-    filters.workflowDecision,
-    filters.weekday,
-    order,
-    page,
-    refreshNonce,
-    sort,
-    timeframe,
-    dashboardMode
-  ]);
-
-  useEffect(() => {
-    if (dashboardMode !== "reels") {
-      return undefined;
-    }
-
-    if (!selectedReel) {
-      return undefined;
-    }
-
-    let ignore = false;
-    setLoadingSnapshots(true);
-
-    fetchSnapshotsWithCompare(selectedReel.reelId, compareReelId || undefined)
-      .then((response) => {
-        if (!ignore) {
-          setSnapshotPayload(response);
-        }
-      })
-      .catch(() => {
-        if (!ignore) {
-          setSnapshotPayload({ data: [], compare: null, benchmark: [] });
-        }
-      })
-      .finally(() => {
-        if (!ignore) {
-          setLoadingSnapshots(false);
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [compareReelId, selectedReel]);
-
-  function handleSortChange(nextSort) {
-    if (sort === nextSort) {
-      setOrder((current) => (current === "asc" ? "desc" : "asc"));
-    } else {
-      setSort(nextSort);
-      setOrder("desc");
-    }
-    setPage(1);
-  }
-
-  function handleTimeframeChange(nextTimeframe) {
-    setTimeframe(nextTimeframe);
-    setPage(1);
-  }
-
-  function updateFilter(key, value) {
-    setFilters((current) => ({
-      ...current,
-      [key]: value
-    }));
-    startTransition(() => {
-      setPage(1);
-    });
-  }
-
-  function resetFilters() {
-    setFilters({
-      q: "",
-      preset: "",
-      boosted: "all",
-      surface: "all",
-      topCountry: "",
-      engagementBand: "all",
-      workflowDecision: "all",
-      weekday: "all",
-      minViews: "0"
-    });
-    startTransition(() => {
-      setPage(1);
-    });
-  }
-
-  function handleSelectReel(reel) {
-    setSelectedReel(reel);
-    setCompareReelId("");
-  }
-
-  async function handleCopySummary() {
-    if (!report?.markdown) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(report.markdown);
-    } catch (_error) {
-      // Ignore clipboard failures in unsupported environments.
     }
   }
 
@@ -358,11 +280,7 @@ export default function App() {
                   {viewerState.viewerMode === "admin" ? "Admin mode" : "Worker mode"}
                 </span>
                 {viewerState.viewerMode === "admin" ? (
-                  <button
-                    type="button"
-                    onClick={handleLockAdminView}
-                    className="rounded-full border border-white/8 px-3 py-1 font-semibold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-white/16 hover:text-white"
-                  >
+                  <button type="button" onClick={handleLockAdminView} className="rounded-full border border-white/8 px-3 py-1 font-semibold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-white/16 hover:text-white">
                     Lock admin
                   </button>
                 ) : null}
@@ -370,18 +288,9 @@ export default function App() {
             ) : null}
           </div>
           <div className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 text-sm">
-            {[
-              { key: "reels", label: "Reels Intelligence" },
-              { key: "monetization", label: "Monetization" }
-            ].map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => handleTabClick(item.key)}
-                className={`rounded-full px-4 py-2 font-semibold transition-colors ${
-                  dashboardMode === item.key ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"
-                }`}
-              >
+            {[{ key: "reels", label: "Reels Intelligence" }, { key: "monetization", label: "Monetization" }].map((item) => (
+              <button key={item.key} type="button" onClick={() => handleTabClick(item.key)}
+                className={`rounded-full px-4 py-2 font-semibold transition-colors ${dashboardMode === item.key ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"}`}>
                 {item.label}
               </button>
             ))}
@@ -406,71 +315,24 @@ export default function App() {
                 <div className="flex flex-col gap-3 md:items-end">
                   <div className="inline-flex rounded-full border border-white/6 bg-white/[0.02] p-1 text-sm">
                     {["30d", "all"].map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => handleTimeframeChange(value)}
-                        className={`rounded-full px-4 py-2 font-semibold transition-colors ${
-                          timeframe === value ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"
-                        }`}
-                      >
+                      <button key={value} type="button" onClick={() => handleTimeframeChange(value)}
+                        className={`rounded-full px-4 py-2 font-semibold transition-colors ${timeframe === value ? "bg-white text-slate-950" : "text-slate-400 hover:text-white"}`}>
                         {value === "30d" ? "Last 30 days" : "All time"}
                       </button>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setRefreshNonce((current) => current + 1)}
-                    className="text-[12px] text-slate-400 transition-colors hover:text-white"
-                  >
+                  <button type="button" onClick={() => setRefreshNonce((c) => c + 1)} className="text-[12px] text-slate-400 transition-colors hover:text-white">
                     Refresh this view
                   </button>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
-                <KpiCard
-                  label="Followers"
-                  value={formatCompactNumber(account?.followers)}
-                  helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"}
-                  accent="#8fbfff"
-                />
-                <KpiCard
-                  label="Reels in view"
-                  value={formatCompactNumber(summary?.count ?? account?.mediaCount)}
-                  helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Latest 30-day slice" : "Full historical library"}
-                  accent="#9cb0d3"
-                />
-                <KpiCard
-                  label="Avg engagement"
-                  value={formatPercent(summary?.averageEngagementRate)}
-                  helper={
-                    summary?.medianEngagementRate
-                      ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel`
-                      : "Mean engagement rate in this view"
-                  }
-                  accent="#c8d2e5"
-                />
-                <KpiCard
-                  label="Avg views / reel"
-                  value={formatCompactNumber(summary?.averageViews)}
-                  helper={
-                    summary?.benchmarks?.previous7dAverageViews
-                      ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort`
-                      : "Average current views per reel"
-                  }
-                  accent="#5875af"
-                />
-                <KpiCard
-                  label="Paid subs"
-                  value={formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}
-                  helper={
-                    paidSubsSummary?.previous?.paidSubs != null
-                      ? `Previous day: ${formatCompactNumber(paidSubsSummary.previous.paidSubs)}`
-                      : "Paid subscriber count"
-                  }
-                  accent="#d4a853"
-                />
+                <KpiCard label="Followers" value={formatCompactNumber(account?.followers)} helper={account?.countries?.[0] ? `Largest audience in ${account.countries[0].code}` : "Live audience size"} accent="#8fbfff" />
+                <KpiCard label="Reels in view" value={formatCompactNumber(summary?.count ?? account?.mediaCount)} helper={filters.preset ? `Preset: ${filters.preset}` : timeframe === "30d" ? "Latest 30-day slice" : "Full historical library"} accent="#9cb0d3" />
+                <KpiCard label="Avg engagement" value={formatPercent(summary?.averageEngagementRate)} helper={summary?.medianEngagementRate ? `${formatMultiplier((summary.averageEngagementRate || 0) / summary.medianEngagementRate)} median reel` : "Mean engagement rate in this view"} accent="#c8d2e5" />
+                <KpiCard label="Avg views / reel" value={formatCompactNumber(summary?.averageViews)} helper={summary?.benchmarks?.previous7dAverageViews ? `${formatMultiplier((summary.averageViews || 0) / summary.benchmarks.previous7dAverageViews)} previous 7d cohort` : "Average current views per reel"} accent="#5875af" />
+                <KpiCard label="Paid subs" value={formatCompactNumber(paidSubsSummary?.latest?.paidSubs)} helper={paidSubsSummary?.previous?.paidSubs != null ? `Previous day: ${formatCompactNumber(paidSubsSummary.previous.paidSubs)}` : "Paid subscriber count"} accent="#d4a853" />
               </div>
 
               <div className="grid gap-3 md:grid-cols-4">
@@ -487,113 +349,82 @@ export default function App() {
                   <p className="mt-2 text-[13px] text-slate-200">{getRefreshCountdown(refreshMeta?.expiresAt)}</p>
                 </div>
                 <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Last updated</p>
-                  <p className="mt-2 text-[13px] text-slate-200">{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Subs trend (7d)</p>
+                  <div className="mt-2"><PaidSubsSparkline /></div>
                 </div>
               </div>
             </div>
           </section>
 
-      {error ? (
-        <section className="panel border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">
-          <p className="font-semibold">Dashboard data failed to load.</p>
-          <p className="mt-2 text-rose-100/80">{error}</p>
-        </section>
-      ) : null}
-
-      {showInitialLoading ? (
-        <section className="panel flex min-h-[280px] items-center justify-center p-6 text-sm text-slate-400">
-          Pulling the latest KPI data from Google Sheets…
-        </section>
-      ) : (
-        <>
-          {loading ? (
-            <section className="panel border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-slate-300">
-              Refreshing the current view without resetting your scroll position…
+          {error ? (
+            <section className="panel border border-rose-500/20 bg-rose-500/10 p-6 text-sm text-rose-100">
+              <p className="font-semibold">Dashboard data failed to load.</p>
+              <p className="mt-2 text-rose-100/80">{error}</p>
             </section>
           ) : null}
 
-          <MobileReelsBriefing
-            summary={summary}
-            topReels={tableData.slice(0, 5)}
-            onSelectReel={handleSelectReel}
-          />
+          {showInitialLoading ? (
+            <section className="panel flex min-h-[280px] items-center justify-center p-6 text-sm text-slate-400">
+              Pulling the latest KPI data from Google Sheets…
+            </section>
+          ) : (
+            <>
+              {loading ? (
+                <section className="panel border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-slate-300">
+                  Refreshing the current view without resetting your scroll position…
+                </section>
+              ) : null}
 
-          <section className="space-y-6 border-t border-white/6 pt-8">
-            <DashboardFilters
-              query={filters.q}
-              preset={filters.preset}
-              boosted={filters.boosted}
-              surface={filters.surface}
-              topCountry={filters.topCountry}
-              engagementBand={filters.engagementBand}
-              workflowDecision={filters.workflowDecision}
-              weekday={filters.weekday}
-              minViews={filters.minViews}
-              presets={summary?.presets || []}
-              countryOptions={account?.countries?.map((country) => country.code) || []}
-              resultCount={pagination.total}
-              onQueryChange={(value) => updateFilter("q", value)}
-              onPresetChange={(value) => updateFilter("preset", value)}
-              onBoostedChange={(value) => updateFilter("boosted", value)}
-              onSurfaceChange={(value) => updateFilter("surface", value)}
-              onTopCountryChange={(value) => updateFilter("topCountry", value)}
-              onEngagementBandChange={(value) => updateFilter("engagementBand", value)}
-              onWorkflowDecisionChange={(value) => updateFilter("workflowDecision", value)}
-              onWeekdayChange={(value) => updateFilter("weekday", value)}
-              onMinViewsChange={(value) => updateFilter("minViews", value)}
-              onReset={resetFilters}
-            />
+              <MobileReelsBriefing summary={summary} topReels={tableData.slice(0, 5)} onSelectReel={handleSelectReel} />
 
-            <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
-            <div className="mt-6 hidden md:block">
-              <ReelsTable
-                reels={tableData}
-                sort={sort}
-                order={order}
-                onSortChange={handleSortChange}
-                page={page}
-                totalPages={totalPages}
-                totalItems={pagination.total}
-                onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
-                onSelectReel={handleSelectReel}
-              />
-            </div>
-          </section>
+              <section className="space-y-6 border-t border-white/6 pt-8">
+                <DashboardFilters
+                  query={filters.q} preset={filters.preset} boosted={filters.boosted}
+                  surface={filters.surface} topCountry={filters.topCountry}
+                  engagementBand={filters.engagementBand} workflowDecision={filters.workflowDecision}
+                  weekday={filters.weekday} minViews={filters.minViews}
+                  presets={summary?.presets || []}
+                  countryOptions={account?.countries?.map((c) => c.code) || []}
+                  resultCount={pagination.total}
+                  onQueryChange={(v) => updateFilter("q", v)} onPresetChange={(v) => updateFilter("preset", v)}
+                  onBoostedChange={(v) => updateFilter("boosted", v)} onSurfaceChange={(v) => updateFilter("surface", v)}
+                  onTopCountryChange={(v) => updateFilter("topCountry", v)}
+                  onEngagementBandChange={(v) => updateFilter("engagementBand", v)}
+                  onWorkflowDecisionChange={(v) => updateFilter("workflowDecision", v)}
+                  onWeekdayChange={(v) => updateFilter("weekday", v)}
+                  onMinViewsChange={(v) => updateFilter("minViews", v)}
+                  onReset={resetFilters}
+                />
 
-          <section className="space-y-6">
-            <CollapsibleAnalysisSection
-              title="Lifecycle view"
-              description="Inspect where momentum is building or dying across the reel aging curve."
-            >
-              <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
-            </CollapsibleAnalysisSection>
+                <MobileDecisionFeed reels={tableData} onSelectReel={handleSelectReel} />
+                <div className="mt-6 hidden md:block">
+                  <ReelsTable
+                    reels={tableData} sort={sort} order={order} onSortChange={handleSortChange}
+                    page={page} totalPages={totalPages} totalItems={pagination.total}
+                    onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
+                    onSelectReel={handleSelectReel}
+                  />
+                </div>
+              </section>
 
-            <CollapsibleAnalysisSection
-              title="Operator report"
-              description="Full written readout and export summary."
-            >
-              <ReportPanel report={report} onCopySummary={handleCopySummary} exportUrl={exportUrl} />
-            </CollapsibleAnalysisSection>
-          </section>
-        </>
-      )}
+              <section className="space-y-6">
+                <CollapsibleAnalysisSection title="Lifecycle view" description="Inspect where momentum is building or dying across the reel aging curve.">
+                  <LifecycleView lifecycle={summary?.lifecycle || []} onSelectReel={handleSelectReel} />
+                </CollapsibleAnalysisSection>
+                <CollapsibleAnalysisSection title="Operator report" description="Full written readout and export summary.">
+                  <ReportPanel report={report} onCopySummary={handleCopySummary} exportUrl={exportUrl} />
+                </CollapsibleAnalysisSection>
+              </section>
+            </>
+          )}
 
           <ReelModal
-            reel={selectedReel}
-            snapshots={snapshotPayload.data}
-            compareSnapshots={snapshotPayload.compare}
-            benchmarkSnapshots={snapshotPayload.benchmark}
-            compareOptions={compareOptions}
-            compareReelId={compareReelId}
-            onCompareChange={setCompareReelId}
-            benchmarks={summary?.benchmarks}
+            reel={selectedReel} snapshots={snapshotPayload.data}
+            compareSnapshots={snapshotPayload.compare} benchmarkSnapshots={snapshotPayload.benchmark}
+            compareOptions={compareOptions} compareReelId={compareReelId}
+            onCompareChange={setCompareReelId} benchmarks={summary?.benchmarks}
             loading={loadingSnapshots}
-            onClose={() => {
-              setSelectedReel(null);
-              setCompareReelId("");
-              setSnapshotPayload({ data: [], compare: null, benchmark: [] });
-            }}
+            onClose={() => { setSelectedReel(null); setCompareReelId(""); setSnapshotPayload({ data: [], compare: null, benchmark: [] }); }}
           />
         </>
       )}

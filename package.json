@@ -19,7 +19,8 @@
     "pg": "^8.14.1"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "vitest": "^4.1.0"
   },
   "engines": {
     "node": ">=20"
