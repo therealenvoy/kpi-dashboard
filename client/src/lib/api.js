@@ -86,3 +86,8 @@ export async function fetchMonetizationSyncJob(jobId) {
   const { data } = await api.get(`/monetization/sync/${jobId}`);
   return data;
 }
+
+export async function fetchDailyLinkTaps() {
+  const { data } = await api.get("/reels/daily-link-taps");
+  return data;
+}

@@ -191,6 +191,24 @@ function createReelsRouter() {
     } catch (error) { next(error); }
   });
 
+  // Aggregate link taps by posted date (for monetization daily feed)
+  router.get("/reels/daily-link-taps", async (_req, res, next) => {
+    try {
+      const reels = await getReelsData();
+      const byDate = {};
+      for (const reel of reels) {
+        if (!reel.postedAt) continue;
+        const date = reel.postedAt.slice(0, 10);
+        if (!byDate[date]) byDate[date] = 0;
+        byDate[date] += reel.linkTaps || 0;
+      }
+      const days = Object.entries(byDate)
+        .map(([date, taps]) => ({ date, linkTaps: taps }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+      res.json({ data: days });
+    } catch (error) { next(error); }
+  });
+
   return { router, getReelsData, getFilteredReels };
 }
 
