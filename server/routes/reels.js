@@ -67,7 +67,7 @@ function applyQueryFilters(reels, query) {
 async function getFilteredReels(query) {
   const timeframe = query.timeframe || "all";
   const reels = await getReelsData();
-  const baseReels = applyTimeframe(reels, timeframe);
+  const baseReels = applyTimeframe(reels, timeframe).filter((reel) => reel.linkTaps > 0);
   const prefiltered = applyQueryFilters(baseReels, { ...query, preset: "", workflowDecision: "all" });
   // Score all reels against age peers using percentile ranking
   let contextualReels = scoreReelsInContext(prefiltered);
