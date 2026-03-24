@@ -75,7 +75,7 @@ export default function App() {
   const [state, dispatch] = useReducer(dashboardReducer, INITIAL_STATE);
   const { account, tableData, summary, report, pagination, paidSubsSummary, refreshMeta, loading, hasLoadedOnce, error } = state;
 
-  const [sort, setSort] = useState("linkTaps");
+  const [sort, setSort] = useState("postedAt");
   const [order, setOrder] = useState("desc");
   const [timeframe, setTimeframe] = useState("30d");
   const [page, setPage] = useState(1);
