@@ -262,7 +262,10 @@ function createReelsRouter() {
         );
       }
       res.json({ ok: true, reelId, reelType: reelType || null });
-    } catch (error) { next(error); }
+    } catch (error) {
+      console.error("[tag] ERROR:", error.message, error.stack);
+      res.status(500).json({ error: "Request failed", details: error.message });
+    }
   });
 
   // Force clear the Google Sheets cache so next request fetches fresh data
