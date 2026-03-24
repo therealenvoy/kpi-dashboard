@@ -68,10 +68,17 @@ function applyQueryFilters(reels, query) {
 
 const VALID_REEL_TYPES = ["Thirst Trap", "Skit", "Reaction/Meme", "Interview"];
 
+async function ensureReelTagsTable() {
+  const { isDatabaseConfigured, ensureMonetizationSchema } = require("../db");
+  if (!isDatabaseConfigured()) return;
+  await ensureMonetizationSchema();
+}
+
 async function loadReelTags() {
   try {
     const { isDatabaseConfigured, query: dbQuery } = require("../db");
     if (!isDatabaseConfigured()) return {};
+    await ensureReelTagsTable();
     const result = await dbQuery("SELECT reel_id, reel_type FROM reel_tags");
     const map = {};
     for (const row of result.rows) map[row.reel_id] = row.reel_type;
@@ -238,6 +245,7 @@ function createReelsRouter() {
     try {
       const { isDatabaseConfigured, query: dbQuery } = require("../db");
       if (!isDatabaseConfigured()) return res.status(503).json({ error: "Database not configured" });
+      await ensureReelTagsTable();
       const { reelId } = req.params;
       const { reelType } = req.body || {};
       if (reelType && !VALID_REEL_TYPES.includes(reelType)) {
