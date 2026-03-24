@@ -244,6 +244,7 @@ function createReelsRouter() {
   router.put("/reels/:reelId/tag", async (req, res, next) => {
     try {
       const { isDatabaseConfigured, query: dbQuery } = require("../db");
+      console.log("[tag] PUT /reels/:reelId/tag", { params: req.params, body: req.body, dbConfigured: isDatabaseConfigured() });
       if (!isDatabaseConfigured()) return res.status(503).json({ error: "Database not configured" });
       await ensureReelTagsTable();
       const { reelId } = req.params;

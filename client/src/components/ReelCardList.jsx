@@ -209,10 +209,14 @@ export default function ReelCardList({ reels, averageTapRate = 0, page, totalPag
   const [localTags, setLocalTags] = useState({});
 
   async function handleTagChange(reelId, reelType) {
+    console.log("[tag] saving", reelId, reelType);
     setLocalTags((prev) => ({ ...prev, [reelId]: reelType }));
     try {
-      await tagReel(reelId, reelType);
-    } catch { /* silent — local state already updated */ }
+      const result = await tagReel(reelId, reelType);
+      console.log("[tag] saved", result);
+    } catch (err) {
+      console.error("[tag] failed", err?.response?.data || err.message || err);
+    }
   }
 
   return (
