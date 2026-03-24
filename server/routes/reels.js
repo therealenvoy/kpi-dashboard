@@ -210,7 +210,7 @@ function createReelsRouter() {
   });
 
   // Force clear the Google Sheets cache so next request fetches fresh data
-  router.post("/refresh", (_req, res) => {
+  router.post("/reels/refresh", (_req, res) => {
     clearCache();
     res.json({ ok: true, message: "Cache cleared. Next request will fetch fresh data." });
   });

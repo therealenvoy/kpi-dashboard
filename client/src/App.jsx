@@ -270,7 +270,7 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                  <button type="button" onClick={() => { forceRefresh().catch(() => {}); setRefreshNonce((c) => c + 1); }} className="text-[11px] text-slate-500 transition-colors hover:text-white">
+                  <button type="button" onClick={async () => { await forceRefresh().catch(() => {}); setRefreshNonce((c) => c + 1); }} className="text-[11px] text-slate-500 transition-colors hover:text-white">
                     Refresh now
                   </button>
                 </div>
