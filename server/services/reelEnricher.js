@@ -80,6 +80,11 @@ function enrichReel(rawReel) {
   const topCountriesWithPct = parsedCountries;
   const viewsPerDay = rawReel.views / Math.max(ageDays, 1);
   const slowdownScore = roundMetric(rawReel.views24hDelta - rawReel.views7dDelta / 7, 1);
+  const tapRate = rawReel.views > 0 && rawReel.linkTaps > 0
+    ? roundMetric((rawReel.linkTaps / rawReel.views) * 100, 2)
+    : 0;
+  const usEntry = parsedCountries.find((c) => c.code.toUpperCase() === "US" || c.code.toUpperCase() === "USA");
+  const usAudienceShare = usEntry ? roundMetric(usEntry.pct, 1) : 0;
 
   return {
     ...rawReel,
@@ -96,6 +101,8 @@ function enrichReel(rawReel) {
     likeRate: roundMetric(likeRate),
     viewsPerDay: roundMetric(viewsPerDay, 0),
     slowdownScore,
+    tapRate,
+    usAudienceShare,
     engagementBand: getEngagementBand(rawReel.engagementRate)
   };
 }

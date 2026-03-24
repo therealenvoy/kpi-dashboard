@@ -9,6 +9,7 @@ import {
 import KpiCard from "./components/KpiCard";
 import PaidSubsSparkline from "./components/PaidSubsSparkline";
 import ReelCardList from "./components/ReelCardList";
+import TapDrivers from "./components/TapDrivers";
 import MonetizationPage from "./pages/MonetizationPage";
 import MonetizationPasswordPrompt from "./components/MonetizationPasswordPrompt";
 
@@ -16,7 +17,8 @@ const PAGE_SIZE = 25;
 
 const INITIAL_FILTERS = {
   q: "",
-  workflowDecision: "all"
+  workflowDecision: "all",
+  reelType: "all"
 };
 
 const INITIAL_STATE = {
@@ -60,7 +62,8 @@ function buildBaseParams(timeframe, filters, deferredQuery) {
   return {
     timeframe,
     q: deferredQuery,
-    workflowDecision: filters.workflowDecision
+    workflowDecision: filters.workflowDecision,
+    reelType: filters.reelType
   };
 }
 
@@ -297,7 +300,8 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
                 <span>{formatCompactNumber(account?.followers)} followers</span>
                 <span>{formatPercent(summary?.averageEngagementRate)} avg ER</span>
-                <span>{formatCompactNumber(summary?.averageViews)} avg views</span>
+                <span>{formatPercent(summary?.averageTapRate)} avg tap rate</span>
+                {summary?.averageUsShare > 0 && <span>{summary.averageUsShare}% US audience</span>}
                 <span>{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</span>
               </div>
             </div>
@@ -353,7 +357,7 @@ export default function App() {
                   />
                 </div>
 
-                {/* Decision pills */}
+                {/* Filter pills + reel type dropdown */}
                 <div className="flex flex-wrap items-center gap-2">
                   {[
                     { key: "all", label: "All" },
@@ -369,16 +373,38 @@ export default function App() {
                       {item.label}
                     </button>
                   ))}
+
+                  <span className="mx-1 text-slate-600">|</span>
+
+                  {/* Reel type dropdown */}
+                  <select
+                    value={filters.reelType}
+                    onChange={(e) => updateFilter("reelType", e.target.value)}
+                    className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300 outline-none focus:border-white/16"
+                  >
+                    <option value="all">All types</option>
+                    <option value="Thirst Trap">Thirst Trap</option>
+                    <option value="Skit">Skit</option>
+                    <option value="Reaction/Meme">Reaction/Meme</option>
+                    <option value="Interview">Interview</option>
+                  </select>
                 </div>
               </section>
 
               {/* Reel cards */}
               <ReelCardList
                 reels={tableData}
+                averageTapRate={summary?.averageTapRate || 0}
                 page={page}
                 totalPages={totalPages}
                 totalItems={pagination.total}
                 onPageChange={(nextPage) => setPage(Math.min(Math.max(nextPage, 1), totalPages))}
+              />
+
+              {/* What drives tap rate — analytics by reel type */}
+              <TapDrivers
+                tapRateByReelType={summary?.tapRateByReelType}
+                averageTapRate={summary?.averageTapRate || 0}
               />
             </>
           )}

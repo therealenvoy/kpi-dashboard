@@ -39,8 +39,10 @@ async function ensureMonetizationSchema() {
     return;
   }
 
-  const sql = fs.readFileSync(path.join(__dirname, "sql", "001_monetization.sql"), "utf8");
-  await query(sql);
+  const sql001 = fs.readFileSync(path.join(__dirname, "sql", "001_monetization.sql"), "utf8");
+  const sql002 = fs.readFileSync(path.join(__dirname, "sql", "002_reel_tags.sql"), "utf8");
+  await query(sql001);
+  await query(sql002);
   schemaEnsured = true;
 }
 

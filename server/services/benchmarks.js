@@ -231,9 +231,49 @@ function summarizeReels(reels) {
     return { ...item, metricValue: roundMetric(metricMap[item.metricLabel] || 0, item.metricLabel === "Slowdown" ? 1 : 0) };
   });
 
+  // Tap rate analytics
+  const reelsWithTaps = reels.filter((reel) => reel.tapRate > 0);
+  const averageTapRate = reelsWithTaps.length
+    ? roundMetric(reelsWithTaps.reduce((sum, reel) => sum + reel.tapRate, 0) / reelsWithTaps.length, 2)
+    : 0;
+
+  // Tap rate by reel type
+  const tapRateByReelType = {};
+  for (const reel of reelsWithTaps) {
+    const type = reel.reelType || "Untagged";
+    if (!tapRateByReelType[type]) tapRateByReelType[type] = { count: 0, totalTapRate: 0, totalTaps: 0 };
+    tapRateByReelType[type].count += 1;
+    tapRateByReelType[type].totalTapRate += reel.tapRate;
+    tapRateByReelType[type].totalTaps += reel.linkTaps || 0;
+  }
+  for (const key of Object.keys(tapRateByReelType)) {
+    tapRateByReelType[key].avgTapRate = roundMetric(tapRateByReelType[key].totalTapRate / tapRateByReelType[key].count, 2);
+  }
+
+  // Tap rate by top country
+  const tapByCountry = {};
+  for (const reel of reelsWithTaps) {
+    const topCode = reel.topCountryCodes?.[0];
+    if (!topCode) continue;
+    if (!tapByCountry[topCode]) tapByCountry[topCode] = { count: 0, totalTapRate: 0 };
+    tapByCountry[topCode].count += 1;
+    tapByCountry[topCode].totalTapRate += reel.tapRate;
+  }
+  const tapRateByTopCountry = {};
+  for (const [code, data] of Object.entries(tapByCountry)) {
+    tapRateByTopCountry[code] = roundMetric(data.totalTapRate / data.count, 2);
+  }
+
+  // Average US audience share
+  const usReels = reels.filter((reel) => reel.usAudienceShare > 0);
+  const averageUsShare = usReels.length
+    ? roundMetric(usReels.reduce((sum, reel) => sum + reel.usAudienceShare, 0) / usReels.length, 1)
+    : 0;
+
   return {
     count, totalViews, totalLikes, totalSaves, totalShares, totalLinkTaps,
-    averageViews, averageEngagementRate,
+    averageViews, averageEngagementRate, averageTapRate, averageUsShare,
+    tapRateByReelType, tapRateByTopCountry,
     medianViews: benchmarks.medianViews,
     medianEngagementRate: benchmarks.medianEngagementRate,
     medianSaveRate: benchmarks.medianSaveRate,

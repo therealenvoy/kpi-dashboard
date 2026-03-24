@@ -57,6 +57,8 @@ function applyQueryFilters(reels, query) {
     if (engagementBand !== "all" && getEngagementBand(reel.engagementRate) !== engagementBand) return false;
     if (workflowDecision !== "all" && reel.workflowDecision !== workflowDecision) return false;
     if (weekday !== "all" && reel.weekday !== weekday) return false;
+    const reelType = String(query.reelType || "all").toLowerCase();
+    if (reelType !== "all" && (reel.reelType || "").toLowerCase() !== reelType) return false;
     if (reel.views < minViews) return false;
     if (maxAgeDays && reel.ageDays > maxAgeDays) return false;
     if (minAgeDays && reel.ageDays < minAgeDays) return false;
@@ -64,10 +66,25 @@ function applyQueryFilters(reels, query) {
   });
 }
 
+const VALID_REEL_TYPES = ["Thirst Trap", "Skit", "Reaction/Meme", "Interview"];
+
+async function loadReelTags() {
+  try {
+    const { isDatabaseConfigured, query: dbQuery } = require("../db");
+    if (!isDatabaseConfigured()) return {};
+    const result = await dbQuery("SELECT reel_id, reel_type FROM reel_tags");
+    const map = {};
+    for (const row of result.rows) map[row.reel_id] = row.reel_type;
+    return map;
+  } catch { return {}; }
+}
+
 async function getFilteredReels(query) {
   const timeframe = query.timeframe || "all";
   const reels = await getReelsData();
-  const baseReels = applyTimeframe(reels, timeframe).filter((reel) => reel.linkTaps > 0);
+  const tags = await loadReelTags();
+  const taggedReels = reels.map((reel) => ({ ...reel, reelType: tags[reel.reelId] || "" }));
+  const baseReels = applyTimeframe(taggedReels, timeframe).filter((reel) => reel.linkTaps > 0);
   const prefiltered = applyQueryFilters(baseReels, { ...query, preset: "", workflowDecision: "all" });
   // Score all reels against age peers using percentile ranking
   let contextualReels = scoreReelsInContext(prefiltered);
@@ -206,6 +223,36 @@ function createReelsRouter() {
         .map(([date, taps]) => ({ date, linkTaps: taps }))
         .sort((a, b) => b.date.localeCompare(a.date));
       res.json({ data: days });
+    } catch (error) { next(error); }
+  });
+
+  // Reel type tags — stored in Postgres
+  router.get("/reels/tags", async (_req, res, next) => {
+    try {
+      const tags = await loadReelTags();
+      res.json({ tags });
+    } catch (error) { next(error); }
+  });
+
+  router.put("/reels/:reelId/tag", async (req, res, next) => {
+    try {
+      const { isDatabaseConfigured, query: dbQuery } = require("../db");
+      if (!isDatabaseConfigured()) return res.status(503).json({ error: "Database not configured" });
+      const { reelId } = req.params;
+      const { reelType } = req.body || {};
+      if (reelType && !VALID_REEL_TYPES.includes(reelType)) {
+        return res.status(400).json({ error: "Invalid reel type", validTypes: VALID_REEL_TYPES });
+      }
+      if (!reelType) {
+        await dbQuery("DELETE FROM reel_tags WHERE reel_id = $1", [reelId]);
+      } else {
+        await dbQuery(
+          `INSERT INTO reel_tags (reel_id, reel_type, updated_at) VALUES ($1, $2, NOW())
+           ON CONFLICT (reel_id) DO UPDATE SET reel_type = $2, updated_at = NOW()`,
+          [reelId, reelType]
+        );
+      }
+      res.json({ ok: true, reelId, reelType: reelType || null });
     } catch (error) { next(error); }
   });
 

@@ -92,6 +92,16 @@ export async function fetchDailyLinkTaps() {
   return data;
 }
 
+export async function fetchReelTags() {
+  const { data } = await api.get("/reels/tags");
+  return data;
+}
+
+export async function tagReel(reelId, reelType) {
+  const { data } = await api.put(`/reels/${encodeURIComponent(reelId)}/tag`, { reelType });
+  return data;
+}
+
 export async function forceRefresh() {
   const { data } = await api.post("/reels/refresh");
   return data;

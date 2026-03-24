@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatCompactNumber, formatPercent, formatRelative, formatSignedCompactNumber, truncate } from "../lib/formatters";
+import { tagReel } from "../lib/api";
 import ReelThumbnail from "./ReelThumbnail";
 
 const COUNTRY_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#a855f7", "#ef4444"];
@@ -61,9 +62,11 @@ function getDecisionStyle(decision) {
   }
 }
 
-function ReelCard({ reel, expanded, onToggle }) {
+function ReelCard({ reel, expanded, onToggle, averageTapRate, onTagChange }) {
   const linkTaps = reel.linkTaps || 0;
   const hasLinkTaps = linkTaps > 0;
+  const tapRate = reel.tapRate || 0;
+  const isHighTapRate = tapRate > 0 && averageTapRate > 0 && tapRate > averageTapRate;
 
   return (
     <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] transition-colors hover:border-white/10">
@@ -75,19 +78,26 @@ function ReelCard({ reel, expanded, onToggle }) {
           <p className="text-[13px] font-medium leading-5 text-slate-100">{truncate(reel.caption, 60)}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
             {hasLinkTaps ? (
-              <span className="font-semibold text-amber-300">🔗 {formatCompactNumber(linkTaps)} link taps</span>
+              <span className="font-semibold text-amber-300">🔗 {formatCompactNumber(linkTaps)} taps</span>
             ) : (
               <span className="text-slate-500">No link taps</span>
             )}
-            {reel.topCountryCodes?.length > 0 && (
-              <span className="text-slate-500">{reel.topCountryCodes.slice(0, 2).join(", ")}</span>
+            {tapRate > 0 && (
+              <span className={`font-semibold ${isHighTapRate ? "text-emerald-300" : "text-slate-400"}`}>
+                {formatPercent(tapRate)} tap rate
+              </span>
+            )}
+            {reel.usAudienceShare > 0 && (
+              <span className="text-sky-300/70">US {reel.usAudienceShare}%</span>
+            )}
+            {reel.reelType && (
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-slate-300">{reel.reelType}</span>
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
             <span className={`inline-flex rounded-full border px-2 py-0.5 font-semibold uppercase tracking-[0.08em] ${getDecisionStyle(reel.workflowDecision)}`}>
               {reel.workflowDecision || "watch"}
             </span>
-            <span className="text-slate-500">Score {reel.performanceScore ?? "—"}</span>
             <span className="text-slate-500">{reel.postedAt ? formatRelative(reel.postedAt) : "—"}</span>
           </div>
         </div>
@@ -145,8 +155,8 @@ function ReelCard({ reel, expanded, onToggle }) {
             <MetricPill label="Surface" value={reel.inFeed ? "In feed" : "Reels only"} />
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-wrap gap-2">
+          {/* Actions + reel type */}
+          <div className="flex flex-wrap items-center gap-2">
             {reel.permalink && (
               <a href={reel.permalink} target="_blank" rel="noreferrer"
                 className="rounded-full border border-white/8 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:border-white/16 hover:text-white">
@@ -158,6 +168,22 @@ function ReelCard({ reel, expanded, onToggle }) {
               className="rounded-full border border-white/8 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:border-white/16 hover:text-white">
               Copy caption
             </button>
+
+            <span className="mx-1 text-slate-600">|</span>
+
+            {/* Reel type dropdown */}
+            <select
+              value={reel.reelType || ""}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => { e.stopPropagation(); onTagChange(reel.reelId, e.target.value || null); }}
+              className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300 outline-none focus:border-white/16"
+            >
+              <option value="">Tag type…</option>
+              <option value="Thirst Trap">Thirst Trap</option>
+              <option value="Skit">Skit</option>
+              <option value="Reaction/Meme">Reaction/Meme</option>
+              <option value="Interview">Interview</option>
+            </select>
           </div>
 
           {reel.workflowReasons?.length > 0 && (
@@ -178,20 +204,35 @@ function MetricPill({ label, value }) {
   );
 }
 
-export default function ReelCardList({ reels, page, totalPages, totalItems, onPageChange }) {
+export default function ReelCardList({ reels, averageTapRate = 0, page, totalPages, totalItems, onPageChange }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [localTags, setLocalTags] = useState({});
+
+  async function handleTagChange(reelId, reelType) {
+    setLocalTags((prev) => ({ ...prev, [reelId]: reelType }));
+    try {
+      await tagReel(reelId, reelType);
+    } catch { /* silent — local state already updated */ }
+  }
 
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        {reels.map((reel) => (
-          <ReelCard
-            key={reel.reelId}
-            reel={reel}
-            expanded={expandedId === reel.reelId}
-            onToggle={() => setExpandedId(expandedId === reel.reelId ? null : reel.reelId)}
-          />
-        ))}
+        {reels.map((reel) => {
+          const mergedReel = localTags[reel.reelId] !== undefined
+            ? { ...reel, reelType: localTags[reel.reelId] }
+            : reel;
+          return (
+            <ReelCard
+              key={reel.reelId}
+              reel={mergedReel}
+              averageTapRate={averageTapRate}
+              expanded={expandedId === reel.reelId}
+              onToggle={() => setExpandedId(expandedId === reel.reelId ? null : reel.reelId)}
+              onTagChange={handleTagChange}
+            />
+          );
+        })}
         {reels.length === 0 && (
           <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] px-6 py-10 text-center text-[13px] text-slate-500">
             No reels match your current filters.
