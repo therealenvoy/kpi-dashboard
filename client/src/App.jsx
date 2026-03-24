@@ -1,5 +1,5 @@
 import { startTransition, useDeferredValue, useEffect, useReducer, useState } from "react";
-import { fetchAccount, fetchPaidSubsSummary, fetchReels, fetchReport, fetchViewer, lockViewer, unlockViewer } from "./lib/api";
+import { fetchAccount, fetchPaidSubsSummary, fetchReels, fetchReport, fetchViewer, forceRefresh, lockViewer, unlockViewer } from "./lib/api";
 import {
   formatCompactNumber,
   formatMultiplier,
@@ -270,8 +270,8 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                  <button type="button" onClick={() => setRefreshNonce((c) => c + 1)} className="text-[11px] text-slate-500 transition-colors hover:text-white">
-                    {getRefreshCountdown(refreshMeta?.expiresAt)}
+                  <button type="button" onClick={() => { forceRefresh().catch(() => {}); setRefreshNonce((c) => c + 1); }} className="text-[11px] text-slate-500 transition-colors hover:text-white">
+                    Refresh now
                   </button>
                 </div>
               </div>

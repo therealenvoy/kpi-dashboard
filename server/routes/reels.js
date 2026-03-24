@@ -1,6 +1,6 @@
 // Reels API routes — account, reels list, snapshots, report, CSV export.
 
-const { getReelsData, getAccountOverview, getSnapshotsData, getRefreshMetadata } = require("../services/sheetsClient");
+const { getReelsData, getAccountOverview, getSnapshotsData, getRefreshMetadata, clearCache } = require("../services/sheetsClient");
 const { scoreReelsInContext, getEngagementBand } = require("../services/reelEnricher");
 const { normalizeCountryCode, getMedian, roundMetric, toSlug } = require("../services/parsers");
 const { sortReels, summarizeReels, generateDailyReport, buildCsv } = require("../services/benchmarks");
@@ -207,6 +207,12 @@ function createReelsRouter() {
         .sort((a, b) => b.date.localeCompare(a.date));
       res.json({ data: days });
     } catch (error) { next(error); }
+  });
+
+  // Force clear the Google Sheets cache so next request fetches fresh data
+  router.post("/refresh", (_req, res) => {
+    clearCache();
+    res.json({ ok: true, message: "Cache cleared. Next request will fetch fresh data." });
   });
 
   return { router, getReelsData, getFilteredReels };

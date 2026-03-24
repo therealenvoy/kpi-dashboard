@@ -39,6 +39,11 @@ async function fetchSheetRange(range, cacheKey) {
   return rows;
 }
 
+function clearCache() {
+  cache.flushAll();
+  Object.keys(cacheMetadata).forEach((k) => delete cacheMetadata[k]);
+}
+
 function getRefreshMetadata() {
   const entries = Object.values(cacheMetadata);
   if (!entries.length) {
@@ -157,5 +162,6 @@ module.exports = {
   getAccountOverview,
   getSnapshotsData,
   getRefreshMetadata,
+  clearCache,
   fetchSheetRange
 };

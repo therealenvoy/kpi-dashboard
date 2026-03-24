@@ -91,3 +91,8 @@ export async function fetchDailyLinkTaps() {
   const { data } = await api.get("/reels/daily-link-taps");
   return data;
 }
+
+export async function forceRefresh() {
+  const { data } = await api.post("/reels/refresh");
+  return data;
+}
