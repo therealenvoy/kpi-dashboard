@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,12 +6,18 @@
 
 :root {
   color-scheme: dark;
-  --accent: 215 184 120;
-  --accent-soft: 215 184 120 / 0.12;
-  --money: 215 184 120;
-  --money-soft: 215 184 120 / 0.14;
-  --cool: 148 158 176;
-  --cool-soft: 148 158 176 / 0.08;
+  --accent: 161 98 7;
+  --accent-soft: 161 98 7 / 0.10;
+  --money: 161 98 7;
+  --money-soft: 161 98 7 / 0.12;
+  --cool: 120 113 108;
+  --cool-soft: 120 113 108 / 0.08;
+  --positive: #22C55E;
+  --negative: #EF4444;
+  --surface: rgba(28, 25, 23, 0.8);
+  --surface-hover: rgba(28, 25, 23, 0.95);
+  --border: rgba(41, 37, 36, 0.6);
+  --border-hover: rgba(68, 64, 60, 0.8);
 }
 
 html {
@@ -21,9 +27,9 @@ html {
 body {
   @apply min-h-screen bg-ink font-body text-slate-100 antialiased;
   background-image:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.04), transparent 26%),
+    radial-gradient(circle at 50% 0%, rgba(28, 25, 23, 0.6), transparent 26%),
     radial-gradient(circle at 78% 8%, rgba(var(--accent-soft)), transparent 18%),
-    linear-gradient(180deg, #060708 0%, #090b0f 38%, #050608 100%);
+    linear-gradient(180deg, #0C0A09 0%, #080706 38%, #0C0A09 100%);
 }
 
 #root {
@@ -31,24 +37,25 @@ body {
 }
 
 .panel {
-  @apply rounded-[2rem] border bg-white/[0.02] backdrop-blur-xl;
-  border-color: rgba(255, 255, 255, 0.06);
+  @apply rounded-[2rem] border backdrop-blur-xl;
+  border-color: var(--border);
+  background: var(--surface);
   box-shadow:
-    0 16px 44px rgba(0, 0, 0, 0.18),
+    0 16px 44px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .hero-shell {
   @apply rounded-[2.3rem] border backdrop-blur-xl;
-  border-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--border);
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.05), transparent 24%),
+    radial-gradient(circle at 12% 0%, rgba(28, 25, 23, 0.9), transparent 24%),
     radial-gradient(circle at 85% 12%, rgba(var(--money-soft)), transparent 18%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008)),
-    #08090b;
+    linear-gradient(180deg, rgba(28, 25, 23, 0.95), rgba(12, 10, 9, 0.98)),
+    #0C0A09;
   box-shadow:
-    0 28px 80px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    0 28px 80px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .hero-primary-card {
@@ -86,14 +93,15 @@ body {
 }
 
 .rank-row {
-  @apply rounded-[1.2rem] border p-4 transition-colors;
-  border-color: rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.012);
+  @apply rounded-[1.2rem] border p-4 transition-all duration-200;
+  border-color: var(--border);
+  background: rgba(28, 25, 23, 0.5);
 }
 
 .rank-row:hover {
-  background: rgba(255, 255, 255, 0.022);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(28, 25, 23, 0.8);
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .leaderboard-row {
@@ -136,11 +144,13 @@ body {
 }
 
 .drilldown-row {
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(28, 25, 23, 0.4);
+  transition: all 0.2s ease;
 }
 
 .drilldown-row:hover {
-  background: rgba(255, 255, 255, 0.032);
+  background: rgba(28, 25, 23, 0.7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .collapsible-panel {

@@ -280,28 +280,31 @@ export default function App() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/60">Paid subs</p>
-                  <p className="font-display text-[3.5rem] leading-[0.9] text-white">{formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}</p>
+                <div className="animate-fade-in space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A16207]/70">Paid subs</p>
+                  <p className="font-display text-[3.5rem] font-semibold leading-[0.9] text-white">{formatCompactNumber(paidSubsSummary?.latest?.paidSubs)}</p>
                   {paidSubsSummary?.previous?.paidSubs != null && (() => {
                     const diff = (paidSubsSummary.latest?.paidSubs || 0) - paidSubsSummary.previous.paidSubs;
                     const sign = diff > 0 ? "+" : "";
-                    const tone = diff > 0 ? "text-emerald-300" : diff < 0 ? "text-rose-300" : "text-slate-500";
+                    const tone = diff > 0 ? "text-[#22C55E]" : diff < 0 ? "text-[#EF4444]" : "text-stone-500";
                     return <p className={`text-[12px] font-medium ${tone}`}>{sign}{formatCompactNumber(diff)} vs previous day</p>;
                   })()}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/60">Bio link taps</p>
-                  <p className="font-display text-[3.5rem] leading-[0.9] text-white">{formatCompactNumber(summary?.totalLinkTaps)}</p>
-                  <p className="text-[12px] text-slate-500">{formatCompactNumber(pagination.total || summary?.count)} reels · {timeframe === "30d" ? "30 days" : "all time"}</p>
+                <div className="animate-fade-in-delay space-y-2 opacity-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#22C55E]/50">Bio link taps</p>
+                  <p className="font-display text-[3.5rem] font-semibold leading-[0.9] text-white">{formatCompactNumber(summary?.totalLinkTaps)}</p>
+                  <p className="text-[12px] text-stone-500">{formatCompactNumber(pagination.total || summary?.count)} reels · {timeframe === "30d" ? "30 days" : "all time"}</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-500">
                 <span>{formatCompactNumber(account?.followers)} followers</span>
+                <span className="text-stone-700">·</span>
                 <span>{formatPercent(summary?.averageEngagementRate)} avg ER</span>
+                <span className="text-stone-700">·</span>
                 <span>{formatPercent(summary?.averageTapRate)} avg tap rate</span>
-                {summary?.averageUsShare > 0 && <span>{summary.averageUsShare}% US audience</span>}
+                {summary?.averageUsShare > 0 && <><span className="text-stone-700">·</span><span>{summary.averageUsShare}% US</span></>}
+                <span className="text-stone-700">·</span>
                 <span>{formatRelative(account?.lastUpdated || summary?.latestUpdate)}</span>
               </div>
             </div>

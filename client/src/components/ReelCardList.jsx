@@ -69,7 +69,7 @@ function ReelCard({ reel, expanded, onToggle, averageTapRate, onTagChange }) {
   const isHighTapRate = tapRate > 0 && averageTapRate > 0 && tapRate > averageTapRate;
 
   return (
-    <div className="rounded-[1.2rem] border border-white/6 bg-white/[0.02] transition-colors hover:border-white/10">
+    <div className="rounded-[1.2rem] border border-stone-800/60 bg-[rgba(28,25,23,0.5)] transition-all duration-200 hover:border-stone-700/80 hover:bg-[rgba(28,25,23,0.8)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)]">
       {/* Main row — always visible */}
       <button type="button" onClick={onToggle} className="flex w-full items-center gap-4 px-4 py-3 text-left">
         <ReelThumbnail reel={reel} className="h-14 w-10 shrink-0" />
@@ -78,7 +78,7 @@ function ReelCard({ reel, expanded, onToggle, averageTapRate, onTagChange }) {
           <p className="text-[13px] font-medium leading-5 text-slate-100">{truncate(reel.caption, 60)}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
             {hasLinkTaps ? (
-              <span className="font-semibold text-amber-300">🔗 {formatCompactNumber(linkTaps)} taps</span>
+              <span className="font-semibold text-[#A16207]">🔗 {formatCompactNumber(linkTaps)} taps</span>
             ) : (
               <span className="text-slate-500">No link taps</span>
             )}

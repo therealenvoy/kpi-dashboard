@@ -168,23 +168,23 @@ export default function MonetizationPage() {
 
       {/* Hero: 2 KPI cards with sparklines */}
       <section className="hero-shell relative overflow-hidden px-6 py-6 md:px-8 md:py-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_12%,rgba(215,184,120,0.06),transparent_18%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_12%,rgba(161,98,7,0.06),transparent_18%)]" />
         <div className="relative space-y-5">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-stone-500">
               {latestFinishedAt ? `Updated ${formatRelative(latestFinishedAt)}` : ""}
             </p>
             <button type="button" onClick={handleSync} disabled={syncing}
-              className="rounded-full bg-sky-300 px-4 py-2 text-[12px] font-semibold text-slate-950 transition-opacity hover:opacity-90 disabled:opacity-60">
+              className="rounded-full bg-[#A16207] px-4 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60">
               {syncing ? "Syncing…" : "Sync now"}
             </button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {/* Paid subs card */}
-            <div className="relative overflow-hidden rounded-[1.4rem] border border-amber-400/10 bg-gradient-to-br from-amber-500/[0.06] to-transparent px-6 py-5">
-              <MiniSparkline data={subsSparkData} color="#fbbf24" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400/70">Paid subs today</p>
+            <div className="animate-fade-in relative overflow-hidden rounded-[1.4rem] border border-[#A16207]/15 bg-gradient-to-br from-[#A16207]/[0.06] to-transparent px-6 py-5">
+              <MiniSparkline data={subsSparkData} color="#A16207" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A16207]/70">Paid subs today</p>
               <div className="mt-2 flex items-end gap-3">
                 <p className="font-display text-[3.8rem] leading-[0.85] text-white">{todaySubs != null ? formatCompactNumber(todaySubs) : "—"}</p>
                 {subsDelta && (
@@ -197,9 +197,9 @@ export default function MonetizationPage() {
             </div>
 
             {/* Link taps card */}
-            <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-400/10 bg-gradient-to-br from-sky-500/[0.06] to-transparent px-6 py-5">
-              <MiniSparkline data={tapsSparkData} color="#38bdf8" />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/70">Bio link taps today</p>
+            <div className="animate-fade-in-delay relative overflow-hidden rounded-[1.4rem] border border-[#22C55E]/15 bg-gradient-to-br from-[#22C55E]/[0.04] to-transparent px-6 py-5 opacity-0">
+              <MiniSparkline data={tapsSparkData} color="#22C55E" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#22C55E]/60">Bio link taps today</p>
               <div className="mt-2 flex items-end gap-3">
                 <p className="font-display text-[3.8rem] leading-[0.85] text-white">{todayTaps != null ? formatCompactNumber(todayTaps) : "—"}</p>
                 {tapsDelta && (
@@ -212,7 +212,7 @@ export default function MonetizationPage() {
             </div>
           </div>
 
-          {error && !hasCriticalError && <p className="text-[11px] text-rose-300">{error}</p>}
+          {error && !hasCriticalError && <p className="text-[11px] text-[#EF4444]">{error}</p>}
         </div>
       </section>
 
@@ -237,30 +237,30 @@ export default function MonetizationPage() {
             const isPeak = isPeakSubs || isPeakTaps;
             return (
               <button key={row.date} type="button" onClick={() => setSelectedDate(row.date)}
-                className={`flex w-full items-center gap-4 rounded-[1rem] border px-4 py-3 text-left transition-all hover:bg-white/[0.04] ${
-                  isPeak ? "border-white/12 bg-white/[0.03]" : "border-white/6 bg-white/[0.015]"
-                }`}>
+                className={`flex w-full items-center gap-4 rounded-[1rem] border px-4 py-3 text-left transition-all duration-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)] ${
+                  isPeak ? "border-stone-700/80 bg-[rgba(28,25,23,0.7)]" : "border-stone-800/60 bg-[rgba(28,25,23,0.4)]"
+                } hover:border-stone-700/80 hover:bg-[rgba(28,25,23,0.8)]`}>
                 {/* Date + peak badge */}
                 <div className="w-20 shrink-0">
                   <span className="text-[13px] font-semibold text-white">{formatDate(row.date)}</span>
-                  {isPeak && <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400/60">peak</p>}
+                  {isPeak && <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#A16207]/70">peak</p>}
                 </div>
 
                 {/* Bars */}
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="w-10 text-right text-[11px] font-semibold text-amber-300">{formatCompactNumber(row.paidSubs)}</span>
+                    <span className="w-10 text-right text-[11px] font-semibold text-[#A16207]">{formatCompactNumber(row.paidSubs)}</span>
                     <div className="flex-1">
-                      <DailyBar value={row.paidSubs || 0} max={maxSubs} gradient="linear-gradient(90deg, #f59e0b, #fbbf24)" glow="rgba(251,191,36,0.3)" />
+                      <DailyBar value={row.paidSubs || 0} max={maxSubs} gradient="linear-gradient(90deg, #92400E, #A16207)" glow="rgba(161,98,7,0.25)" />
                     </div>
-                    <span className="w-8 text-[9px] uppercase text-slate-500">subs</span>
+                    <span className="w-8 text-[9px] uppercase text-stone-600">subs</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-10 text-right text-[11px] font-semibold text-sky-300">{formatCompactNumber(taps)}</span>
+                    <span className="w-10 text-right text-[11px] font-semibold text-[#22C55E]/80">{formatCompactNumber(taps)}</span>
                     <div className="flex-1">
-                      <DailyBar value={taps} max={maxTaps} gradient="linear-gradient(90deg, #0284c7, #38bdf8)" glow="rgba(56,189,248,0.3)" />
+                      <DailyBar value={taps} max={maxTaps} gradient="linear-gradient(90deg, #166534, #22C55E)" glow="rgba(34,197,94,0.2)" />
                     </div>
-                    <span className="w-8 text-[9px] uppercase text-slate-500">taps</span>
+                    <span className="w-8 text-[9px] uppercase text-stone-600">taps</span>
                   </div>
                 </div>
               </button>
